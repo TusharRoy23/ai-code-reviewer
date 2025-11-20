@@ -1,0 +1,7 @@
+{
+    "$schema": "https://langgra.ph/schema.json",
+    "graphs": {
+        "code-review": "./src/core/langgraph/graph.ts:codeReviewGraph"
+    },
+    "env": "./.env"
+}
