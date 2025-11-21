@@ -1,11 +1,10 @@
-// src/state.ts
 import { Annotation } from "@langchain/langgraph";
 
 export type Issue = {
     severity: "critical" | "high" | "medium" | "low" | "info";
-    title: string;
+    type: string;
     description: string;
-    suggestion?: string;
+    recommendation?: string;
     lineStart?: number;
     lineEnd?: number;
 }
@@ -13,8 +12,6 @@ export type Issue = {
 export type Review = {
     chunkId: string;
     filename: string;
-    overallScore?: number;
-    summary: string;
     issues: Issue[];
 }
 

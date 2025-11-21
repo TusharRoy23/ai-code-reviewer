@@ -1,8 +1,12 @@
-// src/graph.ts
 import { ReviewState, type Chunk } from "./state";
-import { z } from "zod";
 import { ChatOpenAI } from "@langchain/openai";
-import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { securityAgent } from "./agents/securityAgent";
+import { correctnessAgent } from "./agents/correctnessAgent";
+import { performanceAgent } from "./agents/performanceAgent";
+import { architectureAgent } from "./agents/architectureAgent";
+import { idiomaticAgent } from "./agents/idiomaticAgent";
+import { readabilityAgent } from "./agents/readabilityAgent";
+import { testingAgent } from "./agents/testingAgent";
 
 // ──────────────────────────────
 // 1. LLM SETUP
@@ -13,26 +17,7 @@ const llm = new ChatOpenAI({
 });
 
 // ──────────────────────────────
-// 2. ZOD SCHEMA FOR STRUCTURED REVIEW
-// ──────────────────────────────
-const IssueSchema = z.object({
-    severity: z.enum(["critical", "high", "medium", "low", "info"]),
-    title: z.string(),
-    description: z.string(),
-    suggestion: z.string().nullable().default(null),
-    lineStart: z.number().nullable().default(null),
-    lineEnd: z.number().nullable().default(null),
-});
-
-const ChunkReviewSchema = z.object({
-    filename: z.string(),
-    overallScore: z.number().min(1).max(10).default(0),
-    summary: z.string(),
-    issues: z.array(IssueSchema),
-});
-
-// ──────────────────────────────
-// 3. SPLIT NODE – turns raw input into chunks
+// 2. SPLIT NODE – turns raw input into chunks
 // ──────────────────────────────
 async function splitIntoChunks(
     state: typeof ReviewState.State
@@ -70,40 +55,8 @@ async function splitIntoChunks(
 }
 
 // ──────────────────────────────
-// 4. REVIEW EACH CHUNKS NODE
+// 3. REVIEW EACH CHUNKS NODE
 // ──────────────────────────────
-const sysPrompt = `You are an expert code reviewer.
-Review ONLY the provided code/diff. Be concise but thorough.
-Focus on correctness, security, performance, readability, and best practices.
-
-Return your answer as JSON exactly matching this shape:
-{{
-  "filename": "<string>",
-  "overallScore": <number 1-10 or null>,
-  "summary": "<string>",
-  "issues": [
-    {{
-      "severity": "critical|high|medium|low|info",
-      "title": "<string>",
-      "description": "<string>",
-      "suggestion": "<string or null>",
-      "lineStart": <number or null>,
-      "lineEnd": <number or null>
-    }}
-  ]
-}}
-Do not wrap in markdown or add explanations outside the JSON.`;
-
-const reviewPrompt = ChatPromptTemplate.fromMessages([
-    ["system", sysPrompt],
-    ["human", "Filename: {filename}\n\n{code}"],
-]);
-
-
-const reviewChain = reviewPrompt.pipe(
-    llm.withStructuredOutput(ChunkReviewSchema)
-);
-
 async function reviewEachChunk(state: { chunkData: Chunk }) {
     // Access the chunk data from state
     const chunkData = state.chunkData;
@@ -112,33 +65,50 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
         console.error("No chunk data provided");
         return { reviews: [] };
     }
+    const results =
+        await Promise.allSettled([
+            securityAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
+            correctnessAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
+            performanceAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
+            testingAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
+            readabilityAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
+            idiomaticAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
+            architectureAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
+        ]);
 
-    const result = await reviewChain.invoke({
-        filename: chunkData.filename,
-        code: chunkData.content,
+    const allReviews = results.map((res, index) => {
+        const agentName = ["security", "correctness", "performance", "testing", "readability", "idiomatic", "architecture"][index];
+
+        if (res.status === "fulfilled") {
+            const messages = res.value?.messages;
+            const lastContent = messages.at(-1)?.content;
+            return {
+                type: agentName,
+                issues: typeof lastContent === "string" ? JSON.parse(lastContent)['issues'] : []
+            };
+        } else {
+            return { type: agentName, issues: [], error: String(res.reason) };
+        }
     });
 
-    // Return as array so reducer can accumulate
     return {
         reviews: [
             {
                 chunkId: chunkData.id,
                 filename: chunkData.filename,
-                overallScore: result.overallScore,
-                summary: result.summary,
-                issues: result.issues || [],
+                issues: allReviews || [],
             },
         ],
     };
 }
 
+// ──────────────────────────────
+// 3. BUILD FINAL REVIEW
+// ──────────────────────────────
 async function finalizeReview(state: typeof ReviewState.State) {
-    // All reviews are now accumulated in state.reviews
-    const reviewsJson = JSON.stringify(state.reviews, null, 2);
-
     // Build your final markdown here
     return {
-        finalReview: `## Code Review Summary\n\n${reviewsJson}`,
+        finalReview: `## Code Review Summary\n\n`,
     };
 }
 

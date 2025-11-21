@@ -9,7 +9,6 @@ app.post("/review", async (req, res) => {
     const graphResult = await codeReviewGraph.invoke({
         rawInput: code
     });
-    // console.log(graphResult);
     res.send({ message: graphResult.reviews });
 });
 export default app;
