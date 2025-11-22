@@ -1,12 +1,7 @@
 import { ReviewState, type Chunk } from "./state";
 import { ChatOpenAI } from "@langchain/openai";
-import { securityAgent } from "./agents/securityAgent";
-import { correctnessAgent } from "./agents/correctnessAgent";
-import { performanceAgent } from "./agents/performanceAgent";
-import { architectureAgent } from "./agents/architectureAgent";
-import { idiomaticAgent } from "./agents/idiomaticAgent";
-import { readabilityAgent } from "./agents/readabilityAgent";
-import { testingAgent } from "./agents/testingAgent";
+import { agentConcurrency } from "../../config/concurrency";
+import { reviewAgents } from "../../utils/utils";
 
 // ──────────────────────────────
 // 1. LLM SETUP
@@ -59,26 +54,32 @@ async function splitIntoChunks(
 // ──────────────────────────────
 async function reviewEachChunk(state: { chunkData: Chunk }) {
     // Access the chunk data from state
-    const chunkData = state.chunkData;
+    // const chunkData = state.chunkData;
+    const { chunkData } = state;
 
     if (!chunkData) {
         console.error("No chunk data provided");
         return { reviews: [] };
     }
-    const results =
-        await Promise.allSettled([
-            securityAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
-            correctnessAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
-            performanceAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
-            testingAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
-            readabilityAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
-            idiomaticAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
-            architectureAgent.invoke({ messages: [{ role: "user", content: chunkData.content }] }),
-        ]);
+
+    // ✅ Skip processing for certain chunks
+    if (chunkData?.filename && chunkData.filename.includes('.test.ts')) {
+        console.log("Skipping test files");
+        return { reviews: [] };
+    }
+
+    const results = await Promise.allSettled(
+        reviewAgents.map(({ agent }) =>
+            agentConcurrency(() =>
+                agent.invoke({
+                    messages: [{ role: "user", content: chunkData.content }]
+                })
+            )
+        )
+    );
 
     const allReviews = results.map((res, index) => {
-        const agentName = ["security", "correctness", "performance", "testing", "readability", "idiomatic", "architecture"][index];
-
+        const agentName = reviewAgents.at(index)?.name;
         if (res.status === "fulfilled") {
             const messages = res.value?.messages;
             const lastContent = messages.at(-1)?.content;

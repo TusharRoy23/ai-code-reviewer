@@ -38,7 +38,10 @@ export const ReviewState = Annotation.Root({
         reducer: (x, y) => y ?? x,
         default: () => [],
     }),
-    // After splitting: one chunk per file (or one chunk total if not a diff)
+    batchIndex: Annotation<number>({  // Which batch (Ex, 0, 2, 4, 6, ...)
+        reducer: (x, y) => y ?? x,
+        default: () => 0,
+    }),
 
     reviews: Annotation<Review[]>({
         reducer: (x, y) => [...(x ?? []), ...(y ?? [])], // concat with the last review,
