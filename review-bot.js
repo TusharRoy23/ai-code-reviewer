@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { codeReviewGraph } from "./dist/core/langgraph/graph.js" // adjust path if needed
 
 async function main() {
+  console.log('process.argv[2]: ', process.argv);
   const diff = readFileSync(process.argv[2] || "pr.diff", "utf-8").trim();
   console.log('diff: ', diff);
   if (!diff) {
