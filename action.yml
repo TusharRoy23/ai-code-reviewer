@@ -91,7 +91,7 @@ runs:
         fi
     - name: Print PR diff for debugging
       shell: bash
-      run: head -n 100 pr.diff
+      run: cat pr.diff
 
     - name: Run AI Code Review
       env:
