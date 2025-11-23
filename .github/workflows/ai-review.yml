@@ -15,7 +15,7 @@ jobs:
             issues: write
 
         steps:
-            # This calls YOUR OWN action from the current repo
+            # Call your local action from the same repo
             - uses: ./
               with:
                   openai-api-key: ${{ secrets.OPENAI_API_KEY }}
