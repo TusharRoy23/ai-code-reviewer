@@ -23,7 +23,7 @@ inputs:
   max-diff-kb:
     description: "Skip if diff is larger than this (KB)"
     required: false
-    default: "800"
+    default: "50"
 
 runs:
   using: "composite"
@@ -89,6 +89,9 @@ runs:
           echo "Diff too large ($SIZE KB). Skipping."
           exit 0
         fi
+    - name: Print PR diff for debugging
+      shell: bash
+      run: head -n 100 pr.diff
 
     - name: Run AI Code Review
       env:
