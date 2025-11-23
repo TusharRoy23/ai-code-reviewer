@@ -15,8 +15,13 @@ jobs:
             issues: write
 
         steps:
-            # Call your local action from the same repo
-            - uses: ./
+            # IMPORTANT: Checkout repository first
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            # Now your local action can be found
+            - name: Run AI Reviewer (local action)
+              uses: ./
               with:
                   openai-api-key: ${{ secrets.OPENAI_API_KEY }}
                   model: gpt-4o-mini
