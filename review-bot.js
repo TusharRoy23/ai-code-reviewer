@@ -4,6 +4,7 @@ import { codeReviewGraph } from "./dist/core/langgraph/graph.js" // adjust path 
 
 async function main() {
   const diff = readFileSync(process.argv[2] || "pr.diff", "utf-8").trim();
+  console.log('diff: ', diff);
   if (!diff) {
     console.log("No changes to review. LGTM!");
     return;
