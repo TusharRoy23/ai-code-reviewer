@@ -1,4 +1,4 @@
-import { makeAgent } from "./makeAgent";
+import { makeAgent } from "./makeAgent.js";
 
 const prompt = `You are an expert in idiomatic programming practices across multiple programming languages.
 Your task is to review the provided code and assess how idiomatic it is relative to:

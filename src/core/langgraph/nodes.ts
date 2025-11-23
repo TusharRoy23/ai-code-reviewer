@@ -1,7 +1,7 @@
-import { ReviewState, type Chunk } from "./state";
+import { ReviewState, type Chunk } from "./state.js";
 import { ChatOpenAI } from "@langchain/openai";
-import { agentConcurrency } from "../../config/concurrency";
-import { reviewAgents } from "../../utils/utils";
+import { agentConcurrency } from "../../config/concurrency.js";
+import { reviewAgents } from "../../utils/utils.js";
 
 // ──────────────────────────────
 // 1. LLM SETUP

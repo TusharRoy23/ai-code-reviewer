@@ -1,4 +1,4 @@
-import { makeAgent } from "./makeAgent";
+import { makeAgent } from "./makeAgent.js";
 
 const prompt = `You are a senior code readability expert.
 Review the code for:

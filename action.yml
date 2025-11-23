@@ -1,0 +1,99 @@
+name: "AI Code Reviewer"
+description: "Instant AI-powered code review on every PR using GPT-4o / Claude / Groq"
+author: "TusharRoy23"
+branding:
+  icon: "zap"
+  color: "purple"
+
+inputs:
+  trigger-phrase:
+    description: "Comment phrase to trigger review (e.g. '@bot review')"
+    required: false
+    default: "@ai-code-reviewer review"
+
+  model:
+    description: "LLM model"
+    required: false
+    default: "gpt-4o-mini"
+
+  openai-api-key:
+    description: "OpenAI API key (fallback to secrets.OPENAI_API_KEY)"
+    required: false
+
+  max-diff-kb:
+    description: "Skip if diff is larger than this (KB)"
+    required: false
+    default: "800"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Skip if not relevant
+      if: >-
+        github.event_name != 'pull_request' &&
+        !contains(github.event.comment.body, inputs.trigger-phrase)
+      shell: bash
+      run: exit 0
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: npm
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Build (if using TypeScript)
+      if: hashFiles('tsconfig.json') != ''
+      shell: bash
+      run: npm run build
+
+    - name: Download PR diff
+      id: diff
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        PR_NUM=${{ github.event.pull_request.number || github.event.issue.number }}
+        curl -sL \
+          -H "Authorization: token $GH_TOKEN" \
+          -H "Accept: application/vnd.github.v3.diff" \
+          "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM" \
+          > pr.diff
+
+        SIZE=$(du -k pr.diff | cut -f1)
+        if [ "$SIZE" -gt "${{ inputs.max-diff-kb }}" ]; then
+          echo "Diff too large ($SIZE KB). Skipping."
+          exit 0
+        fi
+
+    - name: Run AI Code Review
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai-api-key || secrets.OPENAI_API_KEY }}
+        MODEL: ${{ inputs.model }}
+      shell: bash
+      run: |
+        node ${{ github.action_path }}/review-bot.js pr.diff > review.md || exit 1
+
+    - name: Post review
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const body = fs.readFileSync('review.md', 'utf8').trim();
+          if (!body) return;
+
+          const comment = `## AI Code Review\n\n${body}\n\n---\nReviewed with **${{ inputs.model }}**`;
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: ${{ github.event.pull_request.number || github.event.issue.number }},
+            body
+          });

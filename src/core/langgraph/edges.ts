@@ -1,5 +1,5 @@
 import { Send } from "@langchain/langgraph";
-import type { ReviewState } from "./state";
+import type { ReviewState } from "./state.js";
 
 function routeChunksToReview(state: typeof ReviewState.State) {
     const { chunks, batchIndex } = state;

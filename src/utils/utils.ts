@@ -1,10 +1,10 @@
-import { architectureAgent } from "../core/langgraph/agents/architectureAgent";
-import { correctnessAgent } from "../core/langgraph/agents/correctnessAgent";
-import { idiomaticAgent } from "../core/langgraph/agents/idiomaticAgent";
-import { performanceAgent } from "../core/langgraph/agents/performanceAgent";
-import { readabilityAgent } from "../core/langgraph/agents/readabilityAgent";
-import { securityAgent } from "../core/langgraph/agents/securityAgent";
-import { testingAgent } from "../core/langgraph/agents/testingAgent";
+import { architectureAgent } from "../core/langgraph/agents/architectureAgent.js";
+import { correctnessAgent } from "../core/langgraph/agents/correctnessAgent.js";
+import { idiomaticAgent } from "../core/langgraph/agents/idiomaticAgent.js";
+import { performanceAgent } from "../core/langgraph/agents/performanceAgent.js";
+import { readabilityAgent } from "../core/langgraph/agents/readabilityAgent.js";
+import { securityAgent } from "../core/langgraph/agents/securityAgent.js";
+import { testingAgent } from "../core/langgraph/agents/testingAgent.js";
 
 export const reviewAgents = [
     { name: "security", agent: securityAgent },
