@@ -84,9 +84,21 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
             const messages = res.value?.messages;
             const lastContent = messages.at(-1)?.content;
             console.error('lastContent: ', lastContent);
+            const issues = [];
+            if (typeof lastContent === "string" && lastContent.trim()) {
+                try {
+                    // Remove Markdown fences ``` or ```json
+                    const sanitized = lastContent.replace(/```(json|diff)?/g, '').trim();
+                    const parsed = JSON.parse(sanitized);
+                    issues.push(parsed.issues || []);
+                } catch (err) {
+                    console.error("Failed to parse LLM output:", err, "content:", lastContent);
+                    issues.push([]);
+                }
+            }
             return {
                 type: agentName,
-                issues: []
+                issues: issues
                 // issues: typeof lastContent === "string" && lastContent?.length ? JSON.parse(lastContent)['issues'] : []
             };
         } else {
