@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --watch src --exec tsx src/server.ts"
+    "dev": "nodemon --watch src --exec tsx src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "start:prod": "npm run build && npm start"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +24,7 @@
     "express": "^5.1.0",
     "langchain": "^1.0.5",
     "openai": "^6.9.1",
+    "p-limit": "^7.2.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {

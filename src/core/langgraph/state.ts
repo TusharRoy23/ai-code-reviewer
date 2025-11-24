@@ -1,11 +1,10 @@
-// src/state.ts
 import { Annotation } from "@langchain/langgraph";
 
 export type Issue = {
     severity: "critical" | "high" | "medium" | "low" | "info";
-    title: string;
+    type: string;
     description: string;
-    suggestion?: string;
+    recommendation?: string;
     lineStart?: number;
     lineEnd?: number;
 }
@@ -13,8 +12,6 @@ export type Issue = {
 export type Review = {
     chunkId: string;
     filename: string;
-    overallScore?: number;
-    summary: string;
     issues: Issue[];
 }
 
@@ -29,7 +26,7 @@ export const ReviewState = Annotation.Root({
     // INPUT (what the user gives us)
     // ───────────────────────────────
     rawInput: Annotation<string>({
-        reducer: (x, y) => y ?? x,
+        reducer: (x: any, y: any) => y ?? x,
         default: () => "",
     }),
     // The exact text the user pasted: git diff, multiple files, or single snippet
@@ -38,13 +35,16 @@ export const ReviewState = Annotation.Root({
     // INTERMEDIATE
     // ───────────────────────────────
     chunks: Annotation<Chunk[]>({
-        reducer: (x, y) => y ?? x,
+        reducer: (x: any, y: any) => y ?? x,
         default: () => [],
     }),
-    // After splitting: one chunk per file (or one chunk total if not a diff)
+    batchIndex: Annotation<number>({  // Which batch (Ex, 0, 2, 4, 6, ...)
+        reducer: (x: any, y: any) => y ?? x,
+        default: () => 0,
+    }),
 
     reviews: Annotation<Review[]>({
-        reducer: (x, y) => [...(x ?? []), ...(y ?? [])], // concat with the last review,
+        reducer: (x: any, y: any) => [...(x ?? []), ...(y ?? [])], // concat with the last review,
         default: () => [],
     }),
     // Structured reviews from the LLM (one per chunk)
@@ -53,7 +53,7 @@ export const ReviewState = Annotation.Root({
     // FINAL OUTPUT
     // ───────────────────────────────
     finalReview: Annotation<string>({
-        reducer: (x, y) => y ?? x,
+        reducer: (x: any, y: any) => y ?? x,
         default: () => "",
     }),
     // The beautiful markdown comment ready to post on GitHub

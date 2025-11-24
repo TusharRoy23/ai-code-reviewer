@@ -1,0 +1,264 @@
+name: "AI Code Reviewer"
+description: "AI-powered review on every PR"
+author: "TusharRoy23"
+
+inputs:
+  trigger-phrase:
+    description: "Keyword to trigger AI review"
+    default: "@ai-code-reviewer review"
+
+  model:
+    description: "LLM model"
+    default: "gpt-4o-mini"
+
+  openai-api-key:
+    description: "OpenAI API key"
+
+  max-diff-kb:
+    description: "Max diff size in KB"
+    default: "50"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Skip if not relevant
+      if: >-
+        github.event_name != 'pull_request' &&
+        !contains(github.event.comment.body, inputs.trigger-phrase)
+      shell: bash
+      run: exit 0
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install pnpm
+      shell: bash
+      run: npm install -g pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install
+
+    - name: Build (TypeScript)
+      if: hashFiles('tsconfig.json') != ''
+      shell: bash
+      run: pnpm run build
+
+    # ------------------------------------------------------
+    # DOWNLOAD PR DIFF
+    # ------------------------------------------------------
+    - name: Download PR diff
+      id: diff
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        PR_NUM="${{ github.event.pull_request.number }}"
+        if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "null" ]; then
+          PR_NUM="${{ github.event.issue.number }}"
+        fi
+
+        curl -sL \
+          -H "Authorization: token $GH_TOKEN" \
+          -H "Accept: application/vnd.github.v3.diff" \
+          "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM" \
+          > pr.diff
+
+        SIZE=$(du -k pr.diff | cut -f1)
+        if [ "$SIZE" -gt "${{ inputs.max-diff-kb }}" ]; then
+          echo "Diff too large ($SIZE KB). Skipping."
+          exit 0
+        fi
+
+    # ------------------------------------------------------
+    # FILTER DIFF — KEEP ONLY REAL CODE FILES
+    # ------------------------------------------------------
+    - name: Filter meaningful code changes
+      shell: bash
+      run: |
+        echo "Filtering diff..."
+
+        ALLOWED_EXTENSIONS="(ts|tsx|js|jsx|py|java|go|cpp|c|rb|php|swift|rs|kt|scala|cs|html|css|scss|vue|svelte)"
+
+        awk '{ print }' pr.diff > alldiff.tmp
+
+        awk -v EXT="$ALLOWED_EXTENSIONS" '
+          BEGIN { keep = 0; }
+
+          /^diff --git / {
+            match($0, / a\/([^ ]+) b\//, m);
+            file=m[1];
+            keep=0;
+
+            if (file ~ ("\\." EXT "$")) keep=1;
+
+            if (file ~ /(^|\/)(package(-lock)?\.json)$/) keep=0;
+            if (file ~ /(^|\/)pnpm-lock\.yaml$/) keep=0;
+            if (file ~ /(^|\/)yarn\.lock$/) keep=0;
+            if (file ~ /(^|\/)tsconfig.*\.json$/) keep=0;
+            if (file ~ /(^|\/)\.(gitignore|gitattributes|editorconfig)$/) keep=0;
+
+            if (file ~ /\.(md|txt|csv)$/) keep=0;
+
+            if (!keep) {
+              printf "Skipping %s\n", file > "/dev/stderr";
+            }
+          }
+
+          { if (keep) print; }
+        ' alldiff.tmp > pr.filtered.diff
+
+        rm alldiff.tmp
+
+        echo "Filtered diff preview:"
+
+    - name: Show files passing filter
+      shell: bash
+      run: |
+        echo "Files being reviewed:"
+        awk '/^diff --git / { match($0, / b\/(.+)$/, m); if (m[1]) print m[1]; }' pr.filtered.diff
+
+    # ------------------------------------------------------
+    # RUN AI REVIEW
+    # ------------------------------------------------------
+    - name: Run AI Code Review
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        MODEL: ${{ inputs.model }}
+      run: |
+        if [ ! -s pr.filtered.diff ]; then
+          echo "No meaningful code changes. Skipping AI review."
+          exit 0
+        fi
+
+        node ${{ github.action_path }}/review-bot.js pr.filtered.diff > review.md || exit 1
+
+    - name: Post review
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+
+          // Read the review file
+          const reviewContent = fs.readFileSync('review.md', 'utf8').trim();
+
+          if (!reviewContent) {
+            console.log('No review content found');
+            return;
+          }
+
+          let reviews;
+          try {
+            reviews = JSON.parse(reviewContent);
+          } catch (e) {
+            console.error('Failed to parse review.md as JSON:', e.message);
+            console.error('Content:', reviewContent);
+            return;
+          }
+
+          const pr_number = context.payload.pull_request?.number || context.payload.issue?.number;
+
+          if (!pr_number) {
+            console.error('Could not determine PR number');
+            return;
+          }
+
+          console.log(`Posting reviews for PR #${pr_number}`);
+          console.log(`Total files to review: ${reviews.length}`);
+
+          // Get the latest commit SHA
+          const { data: pr } = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: pr_number
+          });
+
+          const commit_id = pr.head.sha;
+          console.log(`Using commit: ${commit_id}`);
+
+          let commentCount = 0;
+          let errorCount = 0;
+
+          for (const chunk of reviews) {
+            const filename = chunk.filename;
+            console.log(`\nProcessing file: ${filename}`);
+            
+            for (const category of chunk.issues) {
+              console.log('category: ', Object.values(category));
+              for (const issue of category.issues) {
+              console.log('issue: ', Object.values(issue));
+                // Skip if no line number
+                if (!issue.lineStart) {
+                  console.log(`  Skipping issue (no lineStart): ${issue.description?.substring(0, 50)}...`);
+                  continue;
+                }
+                
+                const commentBody = `**[${category.type.toUpperCase()}]** ${issue.type || 'Issue'}
+
+                ${issue.description}
+
+                **Recommendation:** ${issue.recommendation}
+
+                **Severity:** ${issue.severity}`;
+                
+                try {
+                  // Use single line comment
+                  await github.rest.pulls.createReviewComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pr_number,
+                    commit_id: commit_id,
+                    path: filename,
+                    line: issue.lineStart,
+                    side: "RIGHT",
+                    body: commentBody
+                  });
+                  
+                  commentCount++;
+                  console.log(`  ✓ Posted comment at line ${issue.lineStart}`);
+                  
+                } catch (error) {
+                  errorCount++;
+                  console.error(`  ✗ Failed to post comment at line ${issue.lineStart}:`, error.message);
+                  
+                  // If it's a validation error, try posting as a general PR comment instead
+                  if (error.status === 422) {
+                    try {
+                      await github.rest.issues.createComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: pr_number,
+                        body: `**${filename}** (around line ${issue.lineStart})\n\n${commentBody}`
+                      });
+                      console.log(`  ✓ Posted as general comment instead`);
+                      commentCount++;
+                    } catch (fallbackError) {
+                      console.error(`  ✗ Fallback also failed:`, fallbackError.message);
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          console.log(`\n=== Summary ===`);
+          console.log(`Comments posted: ${commentCount}`);
+          console.log(`Errors: ${errorCount}`);
+
+          // Post a summary comment
+          if (commentCount > 0) {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr_number,
+              body: `🤖 AI Code Review completed!\n\nPosted ${commentCount} review comment(s) across ${reviews.length} file(s).`
+            });
+          }

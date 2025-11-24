@@ -1,5 +1,5 @@
 import express from "express";
-import { codeReviewGraph } from "./core/langgraph/graph";
+import { codeReviewGraph } from "./core/langgraph/graph.js";
 
 const app = express();
 
@@ -9,7 +9,6 @@ app.post("/review", async (req, res) => {
     const graphResult = await codeReviewGraph.invoke({
         rawInput: code
     });
-    // console.log(graphResult);
     res.send({ message: graphResult.reviews });
 });
 export default app;
