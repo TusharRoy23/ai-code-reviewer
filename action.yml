@@ -147,12 +147,26 @@ runs:
       with:
         script: |
           const fs = require('fs');
-          const body = fs.readFileSync('review.md', 'utf8').trim();
-          if (!body) return;
+          const reviews = JSON.parse(fs.readFileSync('review.md', 'utf8')); // assume JSON output
 
-          github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.payload.pull_request.number || context.payload.issue.number,
-            body
-          });
+          const pr_number = context.payload.pull_request.number;
+
+          for (const chunk of reviews) {
+            const filename = chunk.filename;
+            for (const category of chunk.issues) {
+              for (const issue of category.issues) {
+                // Optional: skip invalid lines
+                if (!issue.lineStart) continue;
+
+                await github.rest.pulls.createReviewComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr_number,
+                  path: filename,
+                  line: issue.lineStart,
+                  side: "RIGHT",
+                  body: `**[${category.type}]** ${issue.description}\nRecommendation: ${issue.recommendation}\nSeverity: ${issue.severity}`
+                });
+              }
+            }
+          }

@@ -83,7 +83,6 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
         if (res.status === "fulfilled") {
             const messages = res.value?.messages;
             const lastContent = messages.at(-1)?.content;
-            console.error('lastContent: ', lastContent);
             const issues = [];
             if (typeof lastContent === "string" && lastContent.trim()) {
                 try {
@@ -99,7 +98,6 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
             return {
                 type: agentName,
                 issues: issues
-                // issues: typeof lastContent === "string" && lastContent?.length ? JSON.parse(lastContent)['issues'] : []
             };
         } else {
             return { type: agentName, issues: [], error: String(res.reason) };
@@ -107,7 +105,6 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
     });
 
     const filteredAllReviews = allReviews.filter(r => r.issues?.length > 0);
-    console.log('filteredAllReviews: ', filteredAllReviews);
 
     return {
         reviews: [
