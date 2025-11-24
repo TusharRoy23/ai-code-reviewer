@@ -192,7 +192,9 @@ runs:
             console.log(`\nProcessing file: ${filename}`);
             
             for (const category of chunk.issues) {
+              console.log('category: ', Object.values(category));
               for (const issue of category.issues) {
+              console.log('issue: ', Object.values(issue));
                 // Skip if no line number
                 if (!issue.lineStart) {
                   console.log(`  Skipping issue (no lineStart): ${issue.description?.substring(0, 50)}...`);
