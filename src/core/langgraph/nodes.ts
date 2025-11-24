@@ -86,7 +86,8 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
             console.error('lastContent: ', lastContent);
             return {
                 type: agentName,
-                issues: typeof lastContent === "string" && lastContent?.length ? JSON.parse(lastContent)['issues'] : []
+                issues: []
+                // issues: typeof lastContent === "string" && lastContent?.length ? JSON.parse(lastContent)['issues'] : []
             };
         } else {
             return { type: agentName, issues: [], error: String(res.reason) };
