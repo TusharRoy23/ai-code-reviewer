@@ -18,8 +18,8 @@ async function main() {
   const escapedDiff = JSON.parse(diff);
   console.error('escapedDiff: ', escapedDiff);
 
-  const result = await codeReviewGraph.invoke({ rawInput: escapedDiff });
-  console.error(result.finalReview || "No issues found. Great job!");
+  // const result = await codeReviewGraph.invoke({ rawInput: escapedDiff });
+  // console.error(result.finalReview || "No issues found. Great job!");
 }
 
 main().catch(err => {
