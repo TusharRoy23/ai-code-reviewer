@@ -83,6 +83,7 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
         if (res.status === "fulfilled") {
             const messages = res.value?.messages;
             const lastContent = messages.at(-1)?.content;
+            console.error('lastContent: ', lastContent);
             return {
                 type: agentName,
                 issues: typeof lastContent === "string" ? JSON.parse(lastContent)['issues'] : []

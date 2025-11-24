@@ -118,7 +118,6 @@ runs:
         rm alldiff.tmp
 
         echo "Filtered diff preview:"
-        head -n 150 pr.filtered.diff || true
 
     # ------------------------------------------------------
     # RUN AI REVIEW
