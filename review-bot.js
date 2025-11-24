@@ -4,18 +4,18 @@ import { codeReviewGraph } from "./dist/core/langgraph/graph.js" // adjust path 
 
 async function main() {
   const diffRaw = readFileSync(process.argv[2] || "pr.diff", "utf-8").trim();
-  if (!diff) {
+  if (!diffRaw) {
     console.log("No changes to review. LGTM!");
     return;
   }
 
-  // 🔥 Make sure the diff is JSON safe
-  const diff = JSON.stringify(diffRaw);   // <-- THIS FIXES YOUR PROBLEM
+  // Make sure the diff is JSON safe
+  const diff = JSON.stringify(diffRaw);
 
-  // OPTIONAL: remove outer quotes so LangGraph receives raw text but escaped
+  // remove outer quotes so LangGraph receives raw text but escaped
   const escapedDiff = JSON.parse(diff);
 
-  const result = await codeReviewGraph.invoke({ rawInput: diescapedDiffff });
+  const result = await codeReviewGraph.invoke({ rawInput: escapedDiff });
   console.log(result.finalReview || "No issues found. Great job!");
 }
 
