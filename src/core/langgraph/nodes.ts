@@ -93,12 +93,14 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
         }
     });
 
+    const filteredAllReviews = allReviews.filter(r => r.issues?.length > 0);
+
     return {
         reviews: [
             {
                 chunkId: chunkData.id,
                 filename: chunkData.filename,
-                issues: allReviews || [],
+                issues: filteredAllReviews || [],
             },
         ],
     };
