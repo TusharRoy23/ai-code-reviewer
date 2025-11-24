@@ -142,31 +142,91 @@ runs:
 
         node ${{ github.action_path }}/review-bot.js pr.filtered.diff > review.md || exit 1
 
-    - name: Post review
+    - name: Post AI Code Review
       uses: actions/github-script@v7
       with:
         script: |
           const fs = require('fs');
-          const reviews = JSON.parse(fs.readFileSync('review.md', 'utf8')); // assume JSON output
-          console.log(reviews);
-          const pr_number = context.payload.pull_request.number;
+          const raw = fs.readFileSync('review.md', 'utf8').trim();
+          if (!raw) {
+            console.log("No review generated.");
+            return;
+          }
 
-          for (const chunk of reviews) {
-            const filename = chunk.filename;
-            for (const category of chunk.issues) {
-              for (const issue of category.issues) {
-                // Optional: skip invalid lines
-                if (!issue.lineStart) continue;
+          let reviews;
+          try {
+            reviews = JSON.parse(raw);
+          } catch (e) {
+            console.log("Invalid JSON, falling back to raw text");
+            await github.rest.issues.createComment({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## AI Code Review\n\n${raw}\n\nReviewed with ${process.env.MODEL || 'GPT-4o'}`
+            });
+            return;
+          }
 
+          const prNumber = context.payload.pull_request.number;
+
+          // ── 1. Post inline comments (one per issue) ─────────────────────
+          for (const file of reviews) {
+            const filename = file.filename;
+
+            for (const category of file.issues || []) {
+              const type = category.type.toUpperCase();
+              const issueList = category.issues.flat(); // flatten nested arrays
+
+              for (const issue of issueList) {
+                if (!issue || !issue.description) continue;
+
+                const severityEmoji = {
+                  critical: "Critical",
+                  high: "High",
+                  medium: "Medium",
+                  low: "Low"
+                }[issue.severity] || "Info";
+
+                const body = `**${type} • ${severityEmoji} ${issue.severity.toUpperCase()}**\n\n` +
+                             `${issue.description}\n\n` +
+                             (issue.recommendation ? `**Fix:** ${issue.recommendation}\n` : "") +
+                             (issue.lineStart ? `\nLines ${issue.lineStart}${issue.lineEnd && issue.lineEnd !== issue.lineStart ? `-${issue.lineEnd}` : ""}` : "");
+
+                // Post inline comment
                 await github.rest.pulls.createReviewComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  pull_number: pr_number,
+                  pull_number: prNumber,
                   path: filename,
-                  line: issue.lineStart,
-                  side: "RIGHT",
-                  body: `**[${category.type}]** ${issue.description}\nRecommendation: ${issue.recommendation}\nSeverity: ${issue.severity}`
+                  body: body,
+                  line: issue.lineStart || 1,
+                  side: "RIGHT"
                 });
               }
             }
           }
+
+          // ── 2. Post summary comment (one per PR) ────────────────────────
+          const totalIssues = reviews.reduce((sum, f) => 
+            sum + (f.issues || []).reduce((s, c) => 
+              s + (c.issues?.flat().length || 0), 0), 0);
+
+          const highCritical = reviews.flatMap(f => f.issues || [])
+            .flatMap(c => c.issues?.flat() || [])
+            .filter(i => i.severity === "high" || i.severity === "critical").length;
+
+          const summaryEmoji = highCritical > 0 ? "Warning" : (totalIssues > 0 ? "Warning" : "Success");
+
+          const summary = `## AI Code Review Complete\n\n` +
+                          `${summaryEmoji} **${totalIssues} issue${totalIssues !== 1 ? 's' : ''} found** ` +
+                          `${highCritical > 0 ? `• ${highCritical} high/critical` : ''}\n\n` +
+                          `Reviewed ${reviews.length} file${reviews.length !== 1 ? 's' : ''} ` +
+                          `using **${process.env.MODEL || 'GPT-4o'}**\n\n` +
+                          `_7 expert agents: security • correctness • performance • testing • readability • idiomatic • architecture_`;
+
+          await github.rest.issues.createComment({
+            issue_number: prNumber,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });
