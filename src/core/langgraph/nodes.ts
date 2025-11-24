@@ -94,6 +94,7 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
     });
 
     const filteredAllReviews = allReviews.filter(r => r.issues?.length > 0);
+    console.log('filteredAllReviews: ', filteredAllReviews);
 
     return {
         reviews: [
@@ -112,7 +113,7 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
 async function finalizeReview(state: typeof ReviewState.State) {
     // Build your final markdown here
     return {
-        finalReview: `## Code Review Summary\n\n`,
+        finalReview: state.reviews,
     };
 }
 
