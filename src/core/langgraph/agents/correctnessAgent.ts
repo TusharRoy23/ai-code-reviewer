@@ -1,4 +1,4 @@
-import { makeAgent } from "./makeAgent";
+import { makeAgent } from "./makeAgent.js";
 
 // agents/correctness-agent.ts
 const prompt = `You are a correctness expert reviewing code.

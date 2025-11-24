@@ -1,19 +1,15 @@
 {
   "compilerOptions": {
-    "allowJs": false,
-    "esModuleInterop": true,
-    "experimentalDecorators": true, // Enable experimental decorators and metadata emission
-    "emitDecoratorMetadata": true, // Enable experimental decorators and metadata emission
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "rootDir": "./src",
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "strict": true,
     "target": "ES2022",
-    "verbatimModuleSyntax": true
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true
   },
   "include": [
     "src/**/*"

@@ -1,7 +1,7 @@
-import { ReviewState, type Chunk } from "./state";
+import { ReviewState, type Chunk } from "./state.js";
 import { ChatOpenAI } from "@langchain/openai";
-import { agentConcurrency } from "../../config/concurrency";
-import { reviewAgents } from "../../utils/utils";
+import { agentConcurrency } from "../../config/concurrency.js";
+import { reviewAgents } from "../../utils/utils.js";
 
 // ──────────────────────────────
 // 1. LLM SETUP
@@ -83,21 +83,34 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
         if (res.status === "fulfilled") {
             const messages = res.value?.messages;
             const lastContent = messages.at(-1)?.content;
+            let issues = [];
+            if (typeof lastContent === "string" && lastContent.trim()) {
+                try {
+                    // Remove Markdown fences ``` or ```json
+                    const sanitized = lastContent.replace(/```(json|diff)?/g, '').trim();
+                    const parsed = JSON.parse(sanitized);
+                    issues = parsed.issues || [];
+                } catch (err) {
+                    console.error("Failed to parse LLM output:", err, "content:", lastContent);
+                }
+            }
             return {
                 type: agentName,
-                issues: typeof lastContent === "string" ? JSON.parse(lastContent)['issues'] : []
+                issues
             };
         } else {
             return { type: agentName, issues: [], error: String(res.reason) };
         }
     });
 
+    const filteredAllReviews = allReviews.filter(r => r.issues?.length > 0);
+
     return {
         reviews: [
             {
                 chunkId: chunkData.id,
                 filename: chunkData.filename,
-                issues: allReviews || [],
+                issues: filteredAllReviews || [],
             },
         ],
     };
@@ -109,7 +122,7 @@ async function reviewEachChunk(state: { chunkData: Chunk }) {
 async function finalizeReview(state: typeof ReviewState.State) {
     // Build your final markdown here
     return {
-        finalReview: `## Code Review Summary\n\n`,
+        finalReview: state.reviews,
     };
 }
 

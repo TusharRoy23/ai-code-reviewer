@@ -1,0 +1,28 @@
+name: "Test AI Reviewer on Itself"
+
+on:
+    pull_request:
+        types: [opened, synchronize]
+    issue_comment:
+        types: [created]
+
+jobs:
+    review:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: write
+            issues: write
+
+        steps:
+            # IMPORTANT: Checkout repository first
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            # Now your local action can be found
+            - name: Run AI Reviewer (local action)
+              uses: ./
+              with:
+                  openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+                  model: gpt-4o-mini
+                  trigger-phrase: "@ai-reviewer test"

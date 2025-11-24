@@ -1,8 +1,8 @@
 import { END, START, StateGraph } from "@langchain/langgraph";
-import { ReviewState } from "./state";
-import { nodes } from "./nodes";
-import { edges } from "./edges";
-import { MAX_CONCURRENT_CHUNKS } from "../../config/concurrency";
+import { ReviewState } from "./state.js";
+import { nodes } from "./nodes.js";
+import { edges } from "./edges.js";
+import { MAX_CONCURRENT_CHUNKS } from "../../config/concurrency.js";
 
 export const codeReviewGraph = new StateGraph(ReviewState)
     .addNode("splitIntoChunks", nodes.splitIntoChunks)

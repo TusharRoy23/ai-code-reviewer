@@ -1,4 +1,4 @@
-import { makeAgent } from "./makeAgent";
+import { makeAgent } from "./makeAgent.js";
 
 const prompt = `You are a senior Software Test Engineer.
 Analyze the code for testability and missing tests.
