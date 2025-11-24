@@ -1,19 +1,19 @@
 import { createAgent } from "langchain";
 
 interface AgentOptions {
-    name: string;
-    model?: string;
-    systemPrompt: string;
-    tools?: any[];
+  name: string;
+  model?: string;
+  systemPrompt: string;
+  tools?: any[];
 }
 
 export function makeAgent({
-    name,
-    model = "gpt-4o-mini",
-    systemPrompt,
-    tools = [],
+  name,
+  model = "gpt-4o-mini",
+  systemPrompt,
+  tools = [],
 }: AgentOptions) {
-    const prompt = `
+  const prompt = `
 You are a senior software engineering analysis agent.
 
 You are reviewing a GIT DIFF. The code is partial and may not include full context.
@@ -39,16 +39,16 @@ Rules:
 
 5. If there are no issues, return {"issues": []}.
 6. Keep descriptions and recommendations short and direct.
-7. Never output anything outside the JSON.
+7. You MUST respond with a **valid JSON object only**. Do NOT include markdown code fences. Do NOT include text before or after.
 8. Your focus areas:
 ${systemPrompt}
     `.trim();
 
-    return createAgent({
-        name,
-        model,
-        tools,
-        systemPrompt: prompt
-    });
+  return createAgent({
+    name,
+    model,
+    tools,
+    systemPrompt: prompt
+  });
 }
 
