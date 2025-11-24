@@ -15,8 +15,8 @@ async function main() {
   // remove outer quotes so LangGraph receives raw text but escaped
   const escapedDiff = JSON.parse(diff);
 
-  const result = await codeReviewGraph.invoke({ rawInput: escapedDiff });
-  console.error(result.finalReview || "No issues found. Great job!");
+  // const result = await codeReviewGraph.invoke({ rawInput: escapedDiff });
+  // console.error(result.finalReview || "No issues found. Great job!");
 }
 
 main().catch(err => {

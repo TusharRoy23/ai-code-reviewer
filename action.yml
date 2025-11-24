@@ -119,6 +119,13 @@ runs:
 
         echo "Filtered diff preview:"
 
+    - name: Show files passing filter
+      shell: bash
+      run: |
+        echo "Files being reviewed:"
+        # Extract filenames from pr.filtered.diff
+        awk '/^diff --git / { match($0, / b\/(.+)$/, m); if (m[1]) print m[1]; }' pr.filtered.diff
+
     # ------------------------------------------------------
     # RUN AI REVIEW
     # ------------------------------------------------------
