@@ -148,7 +148,7 @@ runs:
         script: |
           const fs = require('fs');
           const reviews = JSON.parse(fs.readFileSync('review.md', 'utf8')); // assume JSON output
-
+          console.log(reviews);
           const pr_number = context.payload.pull_request.number;
 
           for (const chunk of reviews) {

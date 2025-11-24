@@ -17,7 +17,6 @@ async function main() {
 
   const result = await codeReviewGraph.invoke({ rawInput: escapedDiff });
   console.log(JSON.stringify(result.reviews || []));
-  console.error(result.reviews || "No issues found. Great job!");
 }
 
 main().catch(err => {
