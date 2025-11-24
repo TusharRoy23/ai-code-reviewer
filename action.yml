@@ -1,39 +1,31 @@
 name: "AI Code Reviewer"
-description: "Instant AI-powered code review on every PR using GPT-4o / Claude / Groq"
+description: "AI-powered review on every PR"
 author: "TusharRoy23"
-branding:
-  icon: "zap"
-  color: "purple"
 
 inputs:
   trigger-phrase:
-    description: "Comment phrase to trigger review"
-    required: false
+    description: "Keyword to trigger AI review"
     default: "@ai-code-reviewer review"
 
   model:
     description: "LLM model"
-    required: false
     default: "gpt-4o-mini"
 
   openai-api-key:
-    description: "OpenAI API key (fallback to secrets.OPENAI_API_KEY)"
-    required: false
+    description: "OpenAI API key"
 
   max-diff-kb:
-    description: "Skip if diff is larger than this (KB)"
-    required: false
+    description: "Max diff size in KB"
     default: "50"
 
 runs:
   using: "composite"
   steps:
     - name: Skip if not relevant
-      shell: bash
-      if: |
+      if: >-
         github.event_name != 'pull_request' &&
-        !(github.event_name == 'issue_comment' &&
-          contains(github.event.comment.body, inputs.trigger-phrase))
+        !contains(github.event.comment.body, inputs.trigger-phrase)
+      shell: bash
       run: exit 0
 
     - name: Checkout code
@@ -54,19 +46,14 @@ runs:
       shell: bash
       run: pnpm install
 
-    # - name: Cache pnpm store
-    #   uses: actions/cache@v3
-    #   with:
-    #     path: ~/.pnpm-store
-    #     key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-pnpm-
-
-    - name: Build (if using TypeScript)
+    - name: Build (TypeScript)
       if: hashFiles('tsconfig.json') != ''
       shell: bash
       run: pnpm run build
 
+    # ------------------------------------------------------
+    # DOWNLOAD PR DIFF
+    # ------------------------------------------------------
     - name: Download PR diff
       id: diff
       shell: bash
@@ -89,34 +76,77 @@ runs:
           echo "Diff too large ($SIZE KB). Skipping."
           exit 0
         fi
-    - name: Print PR diff for debugging
-      shell: bash
-      run: cat pr.diff
 
+    # ------------------------------------------------------
+    # FILTER DIFF — KEEP ONLY REAL CODE FILES
+    # ------------------------------------------------------
+    - name: Filter meaningful code changes
+      shell: bash
+      run: |
+        echo "Filtering diff..."
+
+        ALLOWED_EXTENSIONS="(ts|tsx|js|jsx|py|java|go|cpp|c|rb|php|swift|rs|kt|scala|cs|html|css|scss|vue|svelte)"
+
+        awk '{ print }' pr.diff > alldiff.tmp
+
+        awk -v EXT="$ALLOWED_EXTENSIONS" '
+          BEGIN { keep = 0; }
+
+          /^diff --git / {
+            match($0, / a\/([^ ]+) b\//, m);
+            file=m[1];
+            keep=0;
+
+            if (file ~ ("\\." EXT "$")) keep=1;
+
+            if (file ~ /(^|\/)(package(-lock)?\.json)$/) keep=0;
+            if (file ~ /(^|\/)pnpm-lock\.yaml$/) keep=0;
+            if (file ~ /(^|\/)yarn\.lock$/) keep=0;
+            if (file ~ /(^|\/)tsconfig.*\.json$/) keep=0;
+            if (file ~ /(^|\/)\.(gitignore|gitattributes|editorconfig)$/) keep=0;
+
+            if (file ~ /\.(md|txt|csv)$/) keep=0;
+
+            if (!keep) {
+              printf "Skipping %s\n", file > "/dev/stderr";
+            }
+          }
+
+          { if (keep) print; }
+        ' alldiff.tmp > pr.filtered.diff
+
+        rm alldiff.tmp
+
+        echo "Filtered diff preview:"
+        head -n 50 pr.filtered.diff || true
+
+    # ------------------------------------------------------
+    # RUN AI REVIEW
+    # ------------------------------------------------------
     - name: Run AI Code Review
+      shell: bash
       env:
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         MODEL: ${{ inputs.model }}
-      shell: bash
       run: |
-        node ${{ github.action_path }}/review-bot.js pr.diff > review.md || exit 1
+        if [ ! -s pr.filtered.diff ]; then
+          echo "No meaningful code changes. Skipping AI review."
+          exit 0
+        fi
+
+        node ${{ github.action_path }}/review-bot.js pr.filtered.diff > review.md || exit 1
 
     - name: Post review
       uses: actions/github-script@v7
       with:
         script: |
-          const fs = require("fs");
-          const body = fs.readFileSync("review.md", "utf8").trim();
+          const fs = require('fs');
+          const body = fs.readFileSync('review.md', 'utf8').trim();
           if (!body) return;
 
-          const formatted = `## 🤖 AI Code Review\n\n${body}\n\n---\nReviewed with **${{ inputs.model }}**`;
-
-          const prNumber = context.payload.pull_request?.number ||
-                           context.payload.issue?.number;
-
-          await github.rest.issues.createComment({
+          github.rest.issues.createComment({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            issue_number: prNumber,
-            body: formatted
+            issue_number: context.payload.pull_request.number || context.payload.issue.number,
+            body
           });
