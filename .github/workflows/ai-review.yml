@@ -13,7 +13,7 @@ jobs:
                   fetch-depth: 0 # Important for incremental mode!
 
             - name: AI Code Review
-              uses: ./.github/actions/ai-code-reviewer
+              uses: ./
               with:
                   openai-api-key: ${{ secrets.OPENAI_API_KEY }}
                   review-mode: "incremental" # ← Latest commit only
