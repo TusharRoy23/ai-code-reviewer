@@ -33,8 +33,7 @@ export function makeAgent({
   1. Review ONLY the code that explicitly visible in the GIT DIFF.
   2. Do NOT assume missing code, tests, or missing context.
   3. Return output as JSON and if no issue, return empty array.
-  4. Do NOT include markdown code fences. Do NOT include text before or after.
-  5. Keep "description" and "recommendation" from output schema short and direct.
+  4. Keep "description" and "recommendation" from output schema short and direct.
   `.trim();
 
   return createAgent({

@@ -53,10 +53,10 @@ async function splitIntoChunks(
             });
 
             // DETECT PROJECT CONTEXT FROM ALL CHUNKS
-            console.log(`\n Detecting project context...`);
-            const globalProjectContext = aggregateProjectContext(chunks);
-            const projectContext = generateContextPrompt(globalProjectContext);
-            console.log(`Detected Context:\n${projectContext}`);
+            // console.log(`\n Detecting project context...`);
+            // const globalProjectContext = aggregateProjectContext(chunks);
+            // const projectContext = generateContextPrompt(globalProjectContext);
+            // console.log(`Detected Context:\n${projectContext}`);
 
             // Sort by priority (review important files first)
             chunks.sort((a, b) =>
@@ -67,7 +67,7 @@ async function splitIntoChunks(
 
             return {
                 chunks,
-                projectContext,
+                // projectContext,
             };
         } else {
             // Single snippet (not a diff)
@@ -110,14 +110,14 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
                         messages: [
                             {
                                 role: "user",
-                                content: `
-                                    ${projectContext}\nDIFF CODE:\n${chunkData.content}`
+                                content: chunkData.content
                             }
                         ]
                     })
                 )
             )
         );
+        // ${projectContext}\nDIFF CODE:\n${chunkData.content}`
 
         const allReviews = results.map((res, index) => {
             const agentName = selectedAgents.at(index)?.name;
