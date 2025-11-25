@@ -100,11 +100,17 @@ runs:
           echo "Latest commit: $LATEST_COMMIT"
           
           # Get the previous commit (parent)
-          PREVIOUS_COMMIT=$(git rev-parse ${LATEST_COMMIT}^)
-          echo "Previous commit: $PREVIOUS_COMMIT"
-          
-          # Generate diff for just the latest commit
-          git diff $PREVIOUS_COMMIT $LATEST_COMMIT > pr.diff
+          if PREVIOUS_COMMIT=$(git rev-parse ${LATEST_COMMIT}^ 2>/dev/null); then
+            echo "Previous commit: $PREVIOUS_COMMIT"
+            # Generate diff for just the latest commit
+            git diff $PREVIOUS_COMMIT $LATEST_COMMIT > pr.diff
+          else
+            echo "Could not find parent commit (might be first commit)"
+            echo "Falling back to compare with base branch"
+            # First commit in branch, compare with base
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            git diff $BASE_SHA $LATEST_COMMIT > pr.diff
+          fi
           
           echo "Generated diff for latest commit only"
           
@@ -126,6 +132,12 @@ runs:
 
         if [ "$SIZE" -gt "${{ inputs.max-diff-kb }}" ]; then
           echo "Diff too large (${SIZE} KB > ${{ inputs.max-diff-kb }} KB). Skipping review."
+          echo "large_diff=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        if [ "$SIZE" -eq 0 ]; then
+          echo "Diff is empty (0 KB). Skipping review."
           echo "large_diff=true" >> $GITHUB_OUTPUT
           exit 0
         fi
@@ -175,50 +187,23 @@ runs:
       if: steps.check.outputs.skip != 'true' && steps.diff.outputs.large_diff != 'true'
       shell: bash
       run: |
-        FILE_COUNT=$(grep -c "^diff --git" pr.filtered.diff || echo "0")
+        FILE_COUNT=$(grep -c "^diff --git" pr.filtered.diff 2>/dev/null || echo "0")
         echo "Files being reviewed: $FILE_COUNT"
-        awk '/^diff --git / { 
-          match($0, / b\/(.+)$/, m); 
-          if (m[1]) print "  - " m[1]; 
-        }' pr.filtered.diff
 
-    # ------------------------------------------------------
-    # 3. CHECK IF ALREADY REVIEWED (Incremental mode only)
-    # ------------------------------------------------------
-    - name: Check if commit already reviewed
-      if: steps.check.outputs.skip != 'true' && inputs.review-mode == 'incremental'
-      id: already_reviewed
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        PR_NUM="${{ github.event.pull_request.number }}"
-        LATEST_COMMIT="${{ github.event.pull_request.head.sha }}"
-
-        # Check if we've already posted a review for this commit
-        EXISTING_REVIEW=$(curl -sL \
-          -H "Authorization: token $GH_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM/comments" \
-          | jq -r ".[] | select(.commit_id == \"$LATEST_COMMIT\" and .user.login == \"github-actions[bot]\") | .id" \
-          | head -n 1)
-
-        if [ -n "$EXISTING_REVIEW" ]; then
-          echo "Commit $LATEST_COMMIT already reviewed (comment ID: $EXISTING_REVIEW)"
-          echo "skip_review=true" >> $GITHUB_OUTPUT
-        else
-          echo "New commit, proceeding with review"
-          echo "skip_review=false" >> $GITHUB_OUTPUT
+        if [ "$FILE_COUNT" -gt 0 ]; then
+          awk '/^diff --git / { 
+            match($0, / b\/(.+)$/, m); 
+            if (m[1]) print "  - " m[1]; 
+          }' pr.filtered.diff
         fi
 
     # ------------------------------------------------------
-    # 4. RUN AI REVIEW
+    # 3. RUN AI REVIEW
     # ------------------------------------------------------
     - name: Run AI Code Review
       if: |
         steps.check.outputs.skip != 'true' && 
-        steps.diff.outputs.large_diff != 'true' &&
-        steps.already_reviewed.outputs.skip_review != 'true'
+        steps.diff.outputs.large_diff != 'true'
       id: review
       shell: bash
       env:
@@ -243,7 +228,7 @@ runs:
         fi
 
     # ------------------------------------------------------
-    # 5. POST REVIEW COMMENTS
+    # 4. POST REVIEW COMMENTS
     # ------------------------------------------------------
     - name: Post review comments
       if: |
@@ -265,12 +250,12 @@ runs:
         node ${{ github.action_path }}/post-review.js review.md
 
     # ------------------------------------------------------
-    # 6. CLEANUP
+    # 5. CLEANUP
     # ------------------------------------------------------
     - name: Cleanup
       if: always()
       shell: bash
       run: |
-        echo "🧹 Cleaning up temporary files..."
+        echo "Cleaning up temporary files..."
         rm -f pr.diff pr.filtered.diff alldiff.tmp review.md
         echo "Cleanup complete"
