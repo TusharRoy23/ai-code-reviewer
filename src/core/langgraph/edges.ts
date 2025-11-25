@@ -1,5 +1,5 @@
 import { Send } from "@langchain/langgraph";
-import type { ReviewState } from "./state.js";
+import type { ReviewState } from "./state.ts";
 
 function routeChunksToReview(state: typeof ReviewState.State) {
     const { chunks, batchIndex } = state;
@@ -23,7 +23,7 @@ function routeChunksToReview(state: typeof ReviewState.State) {
     */
     // Process up to 2 chunks in parallel
     return batchChunks.map((chunk) =>
-        new Send("reviewEachChunk", { chunkData: chunk })
+        new Send("reviewEachChunk", { chunkData: chunk, projectContext: state.projectContext })
     );
 }
 

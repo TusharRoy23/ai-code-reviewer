@@ -1,7 +1,8 @@
-import { ReviewState, type Chunk } from "./state.js";
+import { ReviewState, type Chunk } from "./state.ts";
 import { ChatOpenAI } from "@langchain/openai";
-import { agentConcurrency } from "../../config/concurrency.js";
-import { reviewAgents } from "../../utils/utils.js";
+import { agentConcurrency } from "../../config/concurrency.ts";
+import { deduplicateIssues, getFilePriority, isSimpleChange, reviewAgents, selectAgentsForFile, shouldSkipFile } from "../../utils/helper.ts";
+import { aggregateProjectContext, generateContextPrompt } from "../../utils/context.ts";
 
 // ──────────────────────────────
 // 1. LLM SETUP
@@ -25,95 +26,163 @@ async function splitIntoChunks(
             const fileSections = input
                 .split(/diff --git /)
                 .filter(Boolean)
-                .map((section) => `diff --git ${section}`);
+                .map((section: any) => `diff --git ${section}`);
 
-            // Store chunks in state
-            fileSections.forEach((content, i) => {
+            // Parse and filter chunks
+            fileSections.forEach((content: string, i: number) => {
                 const filenameMatch = content.match(/ b\/(.+?)(\s|$)/);
+                const filename = filenameMatch ? filenameMatch[1] : `file_${i}`;
+
+                // Skip unwanted files
+                if (shouldSkipFile(filename)) {
+                    console.log(`⏭️  Skipping: ${filename} (excluded pattern)`);
+                    return;
+                }
+
+                // Skip simple changes
+                if (isSimpleChange(content)) {
+                    console.log(`⏭️  Skipping: ${filename} (simple change)`);
+                    return;
+                }
+
                 chunks.push({
                     id: `${i}`,
-                    filename: filenameMatch ? filenameMatch[1] : `file_${i}`,
+                    filename,
                     content,
                 });
             });
+
+            // DETECT PROJECT CONTEXT FROM ALL CHUNKS
+            console.log(`\n Detecting project context...`);
+            const globalProjectContext = aggregateProjectContext(chunks);
+            const projectContext = generateContextPrompt(globalProjectContext);
+            console.log(`Detected Context:\n${projectContext}`);
+
+            // Sort by priority (review important files first)
+            chunks.sort((a, b) =>
+                getFilePriority(b.filename ?? "") - getFilePriority(a.filename ?? "")
+            );
+
+            console.log(`📊 Split into ${chunks.length} chunks (filtered from ${fileSections.length} files)`);
+
+            return {
+                chunks,
+                projectContext,
+            };
         } else {
+            // Single snippet (not a diff)
             chunks.push({
                 id: "0",
                 filename: "snippet.txt",
                 content: input,
             });
+            return { chunks };
         }
-        return { chunks };
     } catch (error) {
-        return [];
+        return { chunks: [] };
     }
 }
 
 // ──────────────────────────────
 // 3. REVIEW EACH CHUNKS NODE
 // ──────────────────────────────
-async function reviewEachChunk(state: { chunkData: Chunk }) {
-    // Access the chunk data from state
-    // const chunkData = state.chunkData;
-    const { chunkData } = state;
+async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string }) {
+    const { chunkData, projectContext } = state;
 
     if (!chunkData) {
         console.error("No chunk data provided");
         return { reviews: [] };
     }
 
-    // ✅ Skip processing for certain chunks
-    if (chunkData?.filename && chunkData.filename.includes('.test.ts')) {
-        console.log("Skipping test files");
+    console.log(`Reviewing: ${chunkData.filename}`);
+
+    // Smart agent selection based on file type
+    const selectedAgents = selectAgentsForFile(chunkData.filename ?? "", chunkData.content);
+    console.log(`Using ${selectedAgents.length}/${reviewAgents.length} agents: ${selectedAgents.map(a => a.name).join(', ')}`);
+
+    try {
+        // Run selected agents in parallel
+        const results = await Promise.allSettled(
+            selectedAgents.map(({ agent, name }) =>
+                agentConcurrency(() =>
+                    agent.invoke({
+                        messages: [
+                            {
+                                role: "user",
+                                content: `
+                                    ${projectContext}\nDIFF CODE:\n${chunkData.content}`
+                            }
+                        ]
+                    })
+                )
+            )
+        );
+
+        const allReviews = results.map((res, index) => {
+            const agentName = selectedAgents.at(index)?.name;
+            if (res.status === "fulfilled") {
+                const messages = res.value?.messages;
+                const lastContent = messages.at(-1)?.content;
+                let issues = [];
+
+                if (typeof lastContent === "string" && lastContent.trim()) {
+                    try {
+                        // Remove Markdown fences ``` or ```json
+                        const sanitized = lastContent.replace(/```(json|diff)?/g, '').trim();
+                        const parsed = JSON.parse(sanitized);
+                        issues = parsed.issues || [];
+
+                        // Filter out low-severity issues for noise reduction
+                        const beforeFilter = issues.length;
+                        issues = issues.filter((issue: any) =>
+                            issue.severity === 'high' ||
+                            issue.severity === 'critical'
+                        );
+
+                        if (beforeFilter !== issues.length) {
+                            console.log(`  🔽 ${agentName}: filtered ${beforeFilter - issues.length} low/medium severity issues`);
+                        }
+
+                        console.log(`  ✅ ${agentName}: found ${issues.length} high/critical issues`);
+                    } catch (err) {
+                        console.error(`  ❌ Failed to parse ${agentName} output:`, err);
+                        // Log the problematic content for debugging
+                        console.error(`  Raw content: ${lastContent.substring(0, 200)}...`);
+                    }
+                }
+                return {
+                    type: agentName,
+                    issues
+                };
+            } else {
+                console.error(`${agentName} failed:`, res.reason);
+                return { type: agentName, issues: [], error: String(res.reason) };
+            }
+        });
+
+        // Filter out empty reviews
+        const filteredAllReviews = allReviews.filter(r => r.issues?.length > 0);
+
+        // Deduplicate similar issues (reduce noise)
+        const deduplicatedReviews = deduplicateIssues(filteredAllReviews);
+
+        if (deduplicatedReviews.length === 0) {
+            console.log(`No significant issues found in ${chunkData.filename}`);
+        }
+
+        return {
+            reviews: [
+                {
+                    chunkId: chunkData.id,
+                    filename: chunkData.filename,
+                    issues: deduplicatedReviews,
+                },
+            ],
+        };
+    } catch (error) {
+        console.error(`Error reviewing chunk ${chunkData.filename}:`, error);
         return { reviews: [] };
     }
-
-    const results = await Promise.allSettled(
-        reviewAgents.map(({ agent }) =>
-            agentConcurrency(() =>
-                agent.invoke({
-                    messages: [{ role: "user", content: chunkData.content }]
-                })
-            )
-        )
-    );
-
-    const allReviews = results.map((res, index) => {
-        const agentName = reviewAgents.at(index)?.name;
-        if (res.status === "fulfilled") {
-            const messages = res.value?.messages;
-            const lastContent = messages.at(-1)?.content;
-            let issues = [];
-            if (typeof lastContent === "string" && lastContent.trim()) {
-                try {
-                    // Remove Markdown fences ``` or ```json
-                    const sanitized = lastContent.replace(/```(json|diff)?/g, '').trim();
-                    const parsed = JSON.parse(sanitized);
-                    issues = parsed.issues || [];
-                } catch (err) {
-                    console.error("Failed to parse LLM output:", err, "content:", lastContent);
-                }
-            }
-            return {
-                type: agentName,
-                issues
-            };
-        } else {
-            return { type: agentName, issues: [], error: String(res.reason) };
-        }
-    });
-
-    const filteredAllReviews = allReviews.filter(r => r.issues?.length > 0);
-
-    return {
-        reviews: [
-            {
-                chunkId: chunkData.id,
-                filename: chunkData.filename,
-                issues: filteredAllReviews || [],
-            },
-        ],
-    };
 }
 
 // ──────────────────────────────

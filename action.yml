@@ -13,81 +13,132 @@ inputs:
 
   openai-api-key:
     description: "OpenAI API key"
+    required: true
 
   max-diff-kb:
     description: "Max diff size in KB"
     default: "50"
 
+  min-severity:
+    description: "Minimum severity to report (low, medium, high, critical)"
+    default: "medium"
+
+  review-mode:
+    description: "Review mode: 'full' (entire PR) or 'incremental' (latest commit only)"
+    default: "incremental"
+
 runs:
   using: "composite"
   steps:
-    - name: Skip if not relevant
-      if: >-
-        github.event_name != 'pull_request' &&
-        !contains(github.event.comment.body, inputs.trigger-phrase)
+    # ------------------------------------------------------
+    # 1. VALIDATION & SETUP
+    # ------------------------------------------------------
+    - name: Check trigger conditions
+      id: check
       shell: bash
-      run: exit 0
+      run: |
+        if [[ "${{ github.event_name }}" != "pull_request" ]] && \
+           [[ ! "${{ github.event.comment.body }}" =~ "${{ inputs.trigger-phrase }}" ]]; then
+          echo "skip=true" >> $GITHUB_OUTPUT
+          echo "Skipping: Not triggered by PR or trigger phrase"
+        else
+          echo "skip=false" >> $GITHUB_OUTPUT
+          echo "Conditions met, proceeding with review"
+        fi
 
     - name: Checkout code
+      if: steps.check.outputs.skip != 'true'
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 0 # Need full history for incremental mode
 
     - name: Setup Node.js
+      if: steps.check.outputs.skip != 'true'
       uses: actions/setup-node@v4
       with:
         node-version: 20
 
     - name: Install pnpm
+      if: steps.check.outputs.skip != 'true'
       shell: bash
       run: npm install -g pnpm
 
     - name: Install dependencies
+      if: steps.check.outputs.skip != 'true'
       shell: bash
       run: pnpm install
 
-    - name: Build (TypeScript)
-      if: hashFiles('tsconfig.json') != ''
+    - name: Build TypeScript
+      if: steps.check.outputs.skip != 'true' && hashFiles('tsconfig.json') != ''
       shell: bash
       run: pnpm run build
 
     # ------------------------------------------------------
-    # DOWNLOAD PR DIFF
+    # 2. DOWNLOAD DIFF (Full or Incremental)
     # ------------------------------------------------------
     - name: Download PR diff
+      if: steps.check.outputs.skip != 'true'
       id: diff
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        REVIEW_MODE: ${{ inputs.review-mode }}
       run: |
         PR_NUM="${{ github.event.pull_request.number }}"
         if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "null" ]; then
           PR_NUM="${{ github.event.issue.number }}"
         fi
 
-        curl -sL \
-          -H "Authorization: token $GH_TOKEN" \
-          -H "Accept: application/vnd.github.v3.diff" \
-          "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM" \
-          > pr.diff
+        echo "PR Number: $PR_NUM"
+        echo "Review Mode: $REVIEW_MODE"
+
+        if [ "$REVIEW_MODE" = "incremental" ]; then
+          echo "Incremental mode: Reviewing only the latest commit"
+          
+          # Get the latest commit SHA
+          LATEST_COMMIT="${{ github.event.pull_request.head.sha }}"
+          echo "Latest commit: $LATEST_COMMIT"
+          
+          # Get the previous commit (parent)
+          PREVIOUS_COMMIT=$(git rev-parse ${LATEST_COMMIT}^)
+          echo "Previous commit: $PREVIOUS_COMMIT"
+          
+          # Generate diff for just the latest commit
+          git diff $PREVIOUS_COMMIT $LATEST_COMMIT > pr.diff
+          
+          echo "Generated diff for latest commit only"
+          
+        else
+          echo "Full mode: Reviewing entire PR"
+          
+          # Download full PR diff from GitHub API
+          curl -sL \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3.diff" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM" \
+            > pr.diff
+          
+          echo "Downloaded full PR diff"
+        fi
 
         SIZE=$(du -k pr.diff | cut -f1)
+        echo "Diff size: ${SIZE} KB"
+
         if [ "$SIZE" -gt "${{ inputs.max-diff-kb }}" ]; then
-          echo "Diff too large ($SIZE KB). Skipping."
+          echo "Diff too large (${SIZE} KB > ${{ inputs.max-diff-kb }} KB). Skipping review."
+          echo "large_diff=true" >> $GITHUB_OUTPUT
           exit 0
         fi
 
-    # ------------------------------------------------------
-    # FILTER DIFF — KEEP ONLY REAL CODE FILES
-    # ------------------------------------------------------
+        echo "large_diff=false" >> $GITHUB_OUTPUT
+
     - name: Filter meaningful code changes
+      if: steps.check.outputs.skip != 'true' && steps.diff.outputs.large_diff != 'true'
       shell: bash
       run: |
-        echo "Filtering diff..."
+        echo "Filtering diff for meaningful code changes..."
 
         ALLOWED_EXTENSIONS="(ts|tsx|js|jsx|py|java|go|cpp|c|rb|php|swift|rs|kt|scala|cs|html|css|scss|vue|svelte)"
-
-        awk '{ print }' pr.diff > alldiff.tmp
 
         awk -v EXT="$ALLOWED_EXTENSIONS" '
           BEGIN { keep = 0; }
@@ -97,15 +148,18 @@ runs:
             file=m[1];
             keep=0;
 
+            # Include files with allowed extensions
             if (file ~ ("\\." EXT "$")) keep=1;
 
+            # Exclude specific files
             if (file ~ /(^|\/)(package(-lock)?\.json)$/) keep=0;
             if (file ~ /(^|\/)pnpm-lock\.yaml$/) keep=0;
             if (file ~ /(^|\/)yarn\.lock$/) keep=0;
             if (file ~ /(^|\/)tsconfig.*\.json$/) keep=0;
             if (file ~ /(^|\/)\.(gitignore|gitattributes|editorconfig)$/) keep=0;
-
             if (file ~ /\.(md|txt|csv)$/) keep=0;
+            if (file ~ /\.min\.(js|css)$/) keep=0;
+            if (file ~ /\.map$/) keep=0;
 
             if (!keep) {
               printf "Skipping %s\n", file > "/dev/stderr";
@@ -113,152 +167,110 @@ runs:
           }
 
           { if (keep) print; }
-        ' alldiff.tmp > pr.filtered.diff
+        ' pr.diff > pr.filtered.diff
 
-        rm alldiff.tmp
+        echo "Filtering complete"
 
-        echo "Filtered diff preview:"
-
-    - name: Show files passing filter
+    - name: Show files being reviewed
+      if: steps.check.outputs.skip != 'true' && steps.diff.outputs.large_diff != 'true'
       shell: bash
       run: |
-        echo "Files being reviewed:"
-        awk '/^diff --git / { match($0, / b\/(.+)$/, m); if (m[1]) print m[1]; }' pr.filtered.diff
+        FILE_COUNT=$(grep -c "^diff --git" pr.filtered.diff || echo "0")
+        echo "Files being reviewed: $FILE_COUNT"
+        awk '/^diff --git / { 
+          match($0, / b\/(.+)$/, m); 
+          if (m[1]) print "  - " m[1]; 
+        }' pr.filtered.diff
 
     # ------------------------------------------------------
-    # RUN AI REVIEW
+    # 3. CHECK IF ALREADY REVIEWED (Incremental mode only)
+    # ------------------------------------------------------
+    - name: Check if commit already reviewed
+      if: steps.check.outputs.skip != 'true' && inputs.review-mode == 'incremental'
+      id: already_reviewed
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        PR_NUM="${{ github.event.pull_request.number }}"
+        LATEST_COMMIT="${{ github.event.pull_request.head.sha }}"
+
+        # Check if we've already posted a review for this commit
+        EXISTING_REVIEW=$(curl -sL \
+          -H "Authorization: token $GH_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM/comments" \
+          | jq -r ".[] | select(.commit_id == \"$LATEST_COMMIT\" and .user.login == \"github-actions[bot]\") | .id" \
+          | head -n 1)
+
+        if [ -n "$EXISTING_REVIEW" ]; then
+          echo "Commit $LATEST_COMMIT already reviewed (comment ID: $EXISTING_REVIEW)"
+          echo "skip_review=true" >> $GITHUB_OUTPUT
+        else
+          echo "New commit, proceeding with review"
+          echo "skip_review=false" >> $GITHUB_OUTPUT
+        fi
+
+    # ------------------------------------------------------
+    # 4. RUN AI REVIEW
     # ------------------------------------------------------
     - name: Run AI Code Review
+      if: |
+        steps.check.outputs.skip != 'true' && 
+        steps.diff.outputs.large_diff != 'true' &&
+        steps.already_reviewed.outputs.skip_review != 'true'
+      id: review
       shell: bash
       env:
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         MODEL: ${{ inputs.model }}
+        MIN_SEVERITY: ${{ inputs.min-severity }}
       run: |
         if [ ! -s pr.filtered.diff ]; then
-          echo "No meaningful code changes. Skipping AI review."
+          echo "No meaningful code changes found. Skipping AI review."
+          echo "has_changes=false" >> $GITHUB_OUTPUT
           exit 0
         fi
 
-        node ${{ github.action_path }}/review-bot.js pr.filtered.diff > review.md || exit 1
+        echo "Running AI code review with model: $MODEL"
 
-    - name: Post review
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
+        if node ${{ github.action_path }}/review-bot.js pr.filtered.diff > review.md; then
+          echo "AI review completed successfully"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "AI review failed"
+          exit 1
+        fi
 
-          // Read the review file
-          const reviewContent = fs.readFileSync('review.md', 'utf8').trim();
+    # ------------------------------------------------------
+    # 5. POST REVIEW COMMENTS
+    # ------------------------------------------------------
+    - name: Post review comments
+      if: |
+        steps.check.outputs.skip != 'true' && 
+        steps.review.outputs.has_changes == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        REVIEW_MODE: ${{ inputs.review-mode }}
+      run: |
+        echo "Posting review comments to PR..."
 
-          if (!reviewContent) {
-            console.log('No review content found');
-            return;
-          }
+        if [ "$REVIEW_MODE" = "incremental" ]; then
+          echo "Mode: Incremental (latest commit only)"
+        else
+          echo "Mode: Full PR review"
+        fi
 
-          let reviews;
-          try {
-            reviews = JSON.parse(reviewContent);
-          } catch (e) {
-            console.error('Failed to parse review.md as JSON:', e.message);
-            console.error('Content:', reviewContent);
-            return;
-          }
+        node ${{ github.action_path }}/post-review.js review.md
 
-          const pr_number = context.payload.pull_request?.number || context.payload.issue?.number;
-
-          if (!pr_number) {
-            console.error('Could not determine PR number');
-            return;
-          }
-
-          console.log(`Posting reviews for PR #${pr_number}`);
-          console.log(`Total files to review: ${reviews.length}`);
-
-          // Get the latest commit SHA
-          const { data: pr } = await github.rest.pulls.get({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            pull_number: pr_number
-          });
-
-          const commit_id = pr.head.sha;
-          console.log(`Using commit: ${commit_id}`);
-
-          let commentCount = 0;
-          let errorCount = 0;
-
-          for (const chunk of reviews) {
-            const filename = chunk.filename;
-            console.log(`\nProcessing file: ${filename}`);
-            
-            for (const category of chunk.issues) {
-              console.log('category: ', Object.values(category));
-              for (const issue of category.issues) {
-              console.log('issue: ', Object.values(issue));
-                // Skip if no line number
-                if (!issue.lineStart) {
-                  console.log(`  Skipping issue (no lineStart): ${issue.description?.substring(0, 50)}...`);
-                  continue;
-                }
-                
-                const commentBody = `**[${category.type.toUpperCase()}]** ${issue.type || 'Issue'}
-
-                ${issue.description}
-
-                **Recommendation:** ${issue.recommendation}
-
-                **Severity:** ${issue.severity}`;
-                
-                try {
-                  // Use single line comment
-                  await github.rest.pulls.createReviewComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    pull_number: pr_number,
-                    commit_id: commit_id,
-                    path: filename,
-                    line: issue.lineStart,
-                    side: "RIGHT",
-                    body: commentBody
-                  });
-                  
-                  commentCount++;
-                  console.log(`  ✓ Posted comment at line ${issue.lineStart}`);
-                  
-                } catch (error) {
-                  errorCount++;
-                  console.error(`  ✗ Failed to post comment at line ${issue.lineStart}:`, error.message);
-                  
-                  // If it's a validation error, try posting as a general PR comment instead
-                  if (error.status === 422) {
-                    try {
-                      await github.rest.issues.createComment({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        issue_number: pr_number,
-                        body: `**${filename}** (around line ${issue.lineStart})\n\n${commentBody}`
-                      });
-                      console.log(`  ✓ Posted as general comment instead`);
-                      commentCount++;
-                    } catch (fallbackError) {
-                      console.error(`  ✗ Fallback also failed:`, fallbackError.message);
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          console.log(`\n=== Summary ===`);
-          console.log(`Comments posted: ${commentCount}`);
-          console.log(`Errors: ${errorCount}`);
-
-          // Post a summary comment
-          if (commentCount > 0) {
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr_number,
-              body: `🤖 AI Code Review completed!\n\nPosted ${commentCount} review comment(s) across ${reviews.length} file(s).`
-            });
-          }
+    # ------------------------------------------------------
+    # 6. CLEANUP
+    # ------------------------------------------------------
+    - name: Cleanup
+      if: always()
+      shell: bash
+      run: |
+        echo "🧹 Cleaning up temporary files..."
+        rm -f pr.diff pr.filtered.diff alldiff.tmp review.md
+        echo "Cleanup complete"

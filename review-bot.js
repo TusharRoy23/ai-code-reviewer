@@ -1,6 +1,8 @@
 // review-bot.js - Simple CLI that runs your existing LangGraph
-import { readFileSync } from 'fs';
-import { codeReviewGraph } from "./dist/core/langgraph/graph.js" // adjust path if needed
+// import { readFileSync } from 'fs';
+// import { codeReviewGraph } from "./dist/core/langgraph/graph.js" // adjust path if needed
+import { readFileSync } from "fs";
+import { codeReviewGraph } from "./dist/core/langgraph/graph.js";
 
 async function main() {
   const diffRaw = readFileSync(process.argv[2] || "pr.diff", "utf-8").trim();

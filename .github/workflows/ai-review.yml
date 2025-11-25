@@ -1,28 +1,19 @@
-name: "Test AI Reviewer on Itself"
+name: AI Code Review
 
 on:
     pull_request:
-        types: [opened, synchronize]
-    issue_comment:
-        types: [created]
+        types: [opened, synchronize, reopened]
 
 jobs:
     review:
         runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            pull-requests: write
-            issues: write
-
         steps:
-            # IMPORTANT: Checkout repository first
-            - name: Checkout repository
-              uses: actions/checkout@v4
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # Important for incremental mode!
 
-            # Now your local action can be found
-            - name: Run AI Reviewer (local action)
-              uses: ./
+            - name: AI Code Review
+              uses: ./.github/actions/ai-code-reviewer
               with:
                   openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-                  model: gpt-4o-mini
-                  trigger-phrase: "@ai-reviewer test"
+                  review-mode: "incremental" # ← Latest commit only

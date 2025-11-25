@@ -1,7 +1,7 @@
-import { makeAgent } from "./makeAgent.js";
+import { makeAgent } from "./makeAgent.ts";
 
-const prompt = `You are a senior Application Security Engineer.
-Audit ONLY the provided code. Look for:
+const prompt = `You are a Senior Application Security Engineer.
+Audit:
 - SQL/NoSQL injection
 - Broken authentication / authorization
 - Hardcoded secrets / API keys
