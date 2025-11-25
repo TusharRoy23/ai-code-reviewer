@@ -79,6 +79,7 @@ async function splitIntoChunks(
             return { chunks };
         }
     } catch (error) {
+        console.log('node error: ', error);
         return { chunks: [] };
     }
 }
