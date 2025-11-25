@@ -98,13 +98,13 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
     console.log(`Reviewing: ${chunkData.filename}`);
 
     // Smart agent selection based on file type
-    const selectedAgents = selectAgentsForFile(chunkData.filename ?? "", chunkData.content);
-    console.log(`Using ${selectedAgents.length}/${reviewAgents.length} agents: ${selectedAgents.map(a => a.name).join(', ')}`);
+    // const selectedAgents = selectAgentsForFile(chunkData.filename ?? "", chunkData.content);
+    // console.log(`Using ${selectedAgents.length}/${reviewAgents.length} agents: ${selectedAgents.map(a => a.name).join(', ')}`);
 
     try {
         // Run selected agents in parallel
         const results = await Promise.allSettled(
-            selectedAgents.map(({ agent, name }) =>
+            reviewAgents.map(({ agent }) =>
                 agentConcurrency(() =>
                     agent.invoke({
                         messages: [
@@ -120,7 +120,7 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
         // ${projectContext}\nDIFF CODE:\n${chunkData.content}`
 
         const allReviews = results.map((res, index) => {
-            const agentName = selectedAgents.at(index)?.name;
+            const agentName = reviewAgents.at(index)?.name;
             if (res.status === "fulfilled") {
                 const messages = res.value?.messages;
                 const lastContent = messages.at(-1)?.content;
