@@ -59,9 +59,9 @@ async function splitIntoChunks(
             // console.log(`Detected Context:\n${projectContext}`);
 
             // Sort by priority (review important files first)
-            chunks.sort((a, b) =>
-                getFilePriority(b.filename ?? "") - getFilePriority(a.filename ?? "")
-            );
+            // chunks.sort((a, b) =>
+            //     getFilePriority(b.filename ?? "") - getFilePriority(a.filename ?? "")
+            // );
 
             console.log(`📊 Split into ${chunks.length} chunks (filtered from ${fileSections.length} files)`);
 
