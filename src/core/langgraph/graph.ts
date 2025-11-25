@@ -9,9 +9,9 @@ export const codeReviewGraph = new StateGraph(ReviewState)
     .addNode("reviewEachChunk", nodes.reviewEachChunk)        // ← this is the .map() version!
     .addNode("finalizeReview", nodes.finalizeReview)
     // Increment batch index and route again
-    .addNode("routeNextBatch", (state) => ({
-        batchIndex: state.batchIndex + 1,
-    }))
+    // .addNode("routeNextBatch", (state) => ({
+    //     batchIndex: state.batchIndex + 1,
+    // }))
     /* ─────────────── ALL THE CONNECTIONS ───────────────  */
     .addEdge(START, "splitIntoChunks")
     .addConditionalEdges(
@@ -20,16 +20,17 @@ export const codeReviewGraph = new StateGraph(ReviewState)
         ["reviewEachChunk"]
     )
     // After processing batch, check if more batches exist
-    .addConditionalEdges(
-        "reviewEachChunk",
-        (state) => {
-            const nextBatchIndex = state.batchIndex + 1;
-            const hasMoreBatches = (nextBatchIndex * MAX_CONCURRENT_CHUNKS) < state.chunks.length;
+    // .addConditionalEdges(
+    //     "reviewEachChunk",
+    //     (state) => {
+    //         const nextBatchIndex = state.batchIndex + 1;
+    //         const hasMoreBatches = (nextBatchIndex * MAX_CONCURRENT_CHUNKS) < state.chunks.length;
 
-            return hasMoreBatches ? "routeNextBatch" : "finalizeReview";
-        },
-        ["routeNextBatch", "finalizeReview"]
-    )
-    .addEdge("routeNextBatch", "splitIntoChunks")
+    //         return hasMoreBatches ? "routeNextBatch" : "finalizeReview";
+    //     },
+    //     ["routeNextBatch", "finalizeReview"]
+    // )
+    // .addEdge("routeNextBatch", "splitIntoChunks")
+    .addEdge("reviewEachChunk", "finalizeReview")
     .addEdge("finalizeReview", END)
     .compile();

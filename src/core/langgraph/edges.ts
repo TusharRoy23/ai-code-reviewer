@@ -5,15 +5,15 @@ function routeChunksToReview(state: typeof ReviewState.State) {
     const { chunks, batchIndex } = state;
 
     // Get next 2 chunks (batch)
-    const BATCH_SIZE = 2;
-    const batchChunks = chunks.slice(
-        batchIndex * BATCH_SIZE,
-        (batchIndex + 1) * BATCH_SIZE
-    );
+    // const BATCH_SIZE = 2;
+    // const batchChunks = chunks.slice(
+    //     batchIndex * BATCH_SIZE,
+    //     (batchIndex + 1) * BATCH_SIZE
+    // );
 
-    if (batchChunks.length === 0) {
-        return [];  // All batches processed
-    }
+    // if (batchChunks.length === 0) {
+    //     return [];  // All batches processed
+    // }
 
     /*
         DOC URL: https://docs.langchain.com/oss/javascript/langgraph/graph-api#send
@@ -22,7 +22,7 @@ function routeChunksToReview(state: typeof ReviewState.State) {
         /? This example just to understand the visualization
     */
     // Process up to 2 chunks in parallel
-    return batchChunks.map((chunk) =>
+    return chunks.map((chunk) =>
         new Send("reviewEachChunk", { chunkData: chunk, projectContext: state.projectContext })
     );
 }
