@@ -53,7 +53,6 @@ export function makeAgent({
   4. Keep "description" and "recommendation" from output schema short and direct.\n
   ${projectInfo}
   `.trim();
-  console.log('prompt: ', prompt);
 
   return createAgent({
     name,

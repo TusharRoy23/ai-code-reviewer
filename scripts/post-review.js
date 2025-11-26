@@ -32,6 +32,7 @@ async function main() {
         try {
             // Make sure the reviewContent is JSON safe
             const sanitized = reviewContent.replace(/```(json|diff)?/g, '').trim()
+            console.log('sanitized: ', sanitized);
             reviews = JSON.parse(sanitized);
 
             // Validate structure
@@ -39,7 +40,7 @@ async function main() {
                 throw new Error('Reviews must be an array');
             }
 
-            console.log(`📦 Parsed ${reviews.length} review chunks`);
+            console.log(`Parsed ${reviews.length} review chunks`);
         } catch (e) {
             console.error('❌ Failed to parse review file as JSON:', e.message);
             console.error('Content preview:', reviewContent.substring(0, 500));

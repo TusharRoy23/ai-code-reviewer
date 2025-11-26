@@ -280,7 +280,7 @@ runs:
         echo ""
 
         # Run review with tee to see output
-        if node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff | tee review.md; then
+        if node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.md; then
           echo ""
           echo "AI review completed successfully"
           
