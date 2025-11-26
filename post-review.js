@@ -35,8 +35,8 @@ async function main() {
         let reviews;
         // Parse reviews
         try {
-            // reviews = JSON.parse(reviewContent);
-            reviews = reviewContent;
+            // Make sure the reviewContent is JSON safe
+            reviews = JSON.parse(JSON.stringify(reviewContent));
 
             // Validate structure
             if (!Array.isArray(reviews)) {
