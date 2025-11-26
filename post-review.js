@@ -35,7 +35,8 @@ async function main() {
 
         // Parse reviews
         try {
-            reviews = JSON.parse(reviewContent);
+            // reviews = JSON.parse(reviewContent);
+            reviews = reviewContent;
 
             // Validate structure
             if (!Array.isArray(reviews)) {

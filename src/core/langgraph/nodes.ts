@@ -171,12 +171,6 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
             // console.log(`No significant issues found in ${chunkData.filename}`);
         }
 
-        if (deduplicatedReviews.length == 0) {
-            return {
-                reviews: []
-            };
-        }
-
         return {
             reviews: [
                 {
