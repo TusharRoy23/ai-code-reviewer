@@ -172,7 +172,9 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
         }
 
         if (deduplicatedReviews.length == 0) {
-            return {};
+            return {
+                reviews: []
+            };
         }
 
         return {
