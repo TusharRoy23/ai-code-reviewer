@@ -198,20 +198,54 @@ runs:
         fi
 
     - name: Detect project info
+      if: steps.check.outputs.skip != 'true'
       id: projectinfo
       shell: bash
       run: |
-        INFO=$(node scripts/project-info-detector.js)
+        echo "🔍 Detecting project information..."
 
-        LANGS=$(echo "$INFO" | jq -r '.languages | join(",")')
-        FRAMES=$(echo "$INFO" | jq -r '.frameworks | join(",")')
-        LIBS=$(echo "$INFO" | jq -r '.libraries | join(",")')
-        TYPE=$(echo "$INFO" | jq -r '.projectType')
+        # Run the detector script
+        INFO=$(node ${{ github.action_path }}/scripts/project-info-detector.js)
 
-        echo "LANGUAGES=$LANGS" >> $GITHUB_ENV
-        echo "FRAMEWORKS=$FRAMES" >> $GITHUB_ENV
-        echo "LIBRARIES=$LIBS" >> $GITHUB_ENV
-        echo "PROJECT_TYPE=$TYPE" >> $GITHUB_ENV
+        # Check if INFO is valid JSON
+        if ! echo "$INFO" | jq empty 2>/dev/null; then
+          echo "Failed to detect project info, using defaults"
+          echo "LANGUAGES=Unknown" >> $GITHUB_ENV
+          echo "FRAMEWORKS=Unknown" >> $GITHUB_ENV
+          echo "LIBRARIES=Unknown" >> $GITHUB_ENV
+          echo "PROJECT_TYPE=general" >> $GITHUB_ENV
+        else
+          # Parse JSON and set env variables
+          LANGS=$(echo "$INFO" | jq -r '.languages | join(",")')
+          FRAMES=$(echo "$INFO" | jq -r '.frameworks | join(",")')
+          LIBS=$(echo "$INFO" | jq -r '.libraries | join(",")')
+          TYPE=$(echo "$INFO" | jq -r '.projectType')
+          
+          # Handle empty arrays
+          if [ -z "$LANGS" ] || [ "$LANGS" = "null" ]; then
+            LANGS="Unknown"
+          fi
+          if [ -z "$FRAMES" ] || [ "$FRAMES" = "null" ]; then
+            FRAMES="None"
+          fi
+          if [ -z "$LIBS" ] || [ "$LIBS" = "null" ]; then
+            LIBS="None"
+          fi
+          if [ -z "$TYPE" ] || [ "$TYPE" = "null" ]; then
+            TYPE="general"
+          fi
+          
+          echo "LANGUAGES=$LANGS" >> $GITHUB_ENV
+          echo "FRAMEWORKS=$FRAMES" >> $GITHUB_ENV
+          echo "LIBRARIES=$LIBS" >> $GITHUB_ENV
+          echo "PROJECT_TYPE=$TYPE" >> $GITHUB_ENV
+          
+          echo "   Detected:"
+          echo "   Languages: $LANGS"
+          echo "   Frameworks: $FRAMES"
+          echo "   Libraries: $LIBS"
+          echo "   Type: $TYPE"
+        fi
 
     # ------------------------------------------------------
     # 3. RUN AI REVIEW
@@ -237,17 +271,35 @@ runs:
           exit 0
         fi
 
-        echo "Running AI code review with model: $MODEL"
-        echo "Detected languages: $LANGUAGES"
-        echo "Detected frameworks: $FRAMEWORKS"
-        echo "Detected libraries: $LIBRARIES"
-        echo "Detected project type: $PROJECT_TYPE"
+        echo "   Running AI code review..."
+        echo "   Model: $MODEL"
+        echo "   Languages: $LANGUAGES"
+        echo "   Frameworks: $FRAMEWORKS"
+        echo "   Libraries: $LIBRARIES"
+        echo "   Project Type: $PROJECT_TYPE"
+        echo ""
 
-        if node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.md; then
+        # Run review with tee to see output
+        if node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff | tee review.md; then
+          echo ""
           echo "AI review completed successfully"
+          
+          # Show statistics
+          if [ -f review.md ]; then
+            SIZE=$(wc -c < review.md)
+            LINES=$(wc -l < review.md)
+            echo "Generated review: $SIZE bytes, $LINES lines"
+            
+            # Validate JSON
+            if cat review.md | jq empty 2>/dev/null; then
+              CHUNKS=$(cat review.md | jq 'length')
+              echo "Review chunks: $CHUNKS"
+            else
+              echo "Output is not valid JSON"
+            fi
+          fi
+          
           echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "Reviewing Output"
-          cat review.md
         else
           echo "AI review failed"
           exit 1

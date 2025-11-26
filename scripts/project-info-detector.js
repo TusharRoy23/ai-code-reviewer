@@ -15,9 +15,9 @@ function readJsonSafe(filePath) {
 function detectLanguages() {
     const extMap = {
         js: "JavaScript",
-        jsx: "JavaScript (React likely)",
+        jsx: "JavaScript",
         ts: "TypeScript",
-        tsx: "TypeScript (React likely)",
+        tsx: "TypeScript",
         py: "Python",
         php: "PHP",
         go: "Go",
@@ -30,17 +30,19 @@ function detectLanguages() {
         css: "CSS",
         scss: "SCSS",
         sql: "SQL",
-        sh: "Shell Script"
+        sh: "Shell"
     };
 
     const detected = new Set();
 
     for (const ext of Object.keys(extMap)) {
         const files = globSync(`**/*.${ext}`, {
-            ignore: ["node_modules/**", "dist/**", "build/**"]
+            ignore: ["node_modules/**", "dist/**", "build/**", ".git/**"]
         });
 
-        if (files.length > 0) detected.add(extMap[ext]);
+        if (files.length > 0) {
+            detected.add(extMap[ext]);
+        }
     }
 
     return Array.from(detected);
@@ -50,27 +52,50 @@ function detectLanguages() {
 function detectFrameworks() {
     const frameworks = new Set();
 
-    const filePatterns = {
-        React: ["**/*.jsx", "**/*.tsx"],
-        Angular: ["**/*.component.ts", "**/*.module.ts"],
-        Vue: ["**/*.vue"],
-        NextJS: ["next.config.js", "next.config.mjs", "pages/**", "app/**"],
-        Nuxt: ["nuxt.config.ts", "pages/**"],
-        Svelte: ["**/*.svelte"],
-        Express: ["**/*.js"],
-        Django: ["manage.py", "**/settings.py"],
-        Flask: ["**/*.py"],
-        FastAPI: ["**/*.py"],
-    };
-
-    for (const [framework, patterns] of Object.entries(filePatterns)) {
-        for (const pat of patterns) {
-            if (glob.sync(pat, { ignore: "node_modules/**" }).length > 0) {
-                frameworks.add(framework);
-                break;
-            }
-        }
+    // Check Next.js
+    if (fs.existsSync("next.config.js") || fs.existsSync("next.config.mjs") || fs.existsSync("next.config.ts")) {
+        frameworks.add("Next.js");
     }
+
+    // Check Nuxt
+    if (fs.existsSync("nuxt.config.ts") || fs.existsSync("nuxt.config.js")) {
+        frameworks.add("Nuxt");
+    }
+
+    // Check for React (package.json check)
+    const pkg = readJsonSafe("package.json");
+    if (pkg) {
+        const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+
+        if (allDeps.react) frameworks.add("React");
+        if (allDeps.vue) frameworks.add("Vue");
+        if (allDeps["@angular/core"]) frameworks.add("Angular");
+        if (allDeps.svelte) frameworks.add("Svelte");
+        if (allDeps.express) frameworks.add("Express");
+        if (allDeps.nestjs || allDeps["@nestjs/core"]) frameworks.add("NestJS");
+    }
+
+    // Check Python frameworks
+    const reqFile = fs.existsSync("requirements.txt")
+        ? fs.readFileSync("requirements.txt", "utf8")
+        : "";
+
+    if (reqFile.includes("django") || fs.existsSync("manage.py")) {
+        frameworks.add("Django");
+    }
+    if (reqFile.includes("flask")) {
+        frameworks.add("Flask");
+    }
+    if (reqFile.includes("fastapi")) {
+        frameworks.add("FastAPI");
+    }
+
+    // Check for Vue/Svelte files
+    const vueFiles = globSync("**/*.vue", { ignore: ["node_modules/**"] });
+    if (vueFiles.length > 0) frameworks.add("Vue");
+
+    const svelteFiles = globSync("**/*.svelte", { ignore: ["node_modules/**"] });
+    if (svelteFiles.length > 0) frameworks.add("Svelte");
 
     return Array.from(frameworks);
 }
@@ -86,20 +111,35 @@ function detectLibraries() {
             ...pkg.devDependencies,
         };
 
-        for (const lib of Object.keys(deps || {})) libs.add(lib);
+        // Only include major libraries, not everything
+        const majorLibs = [
+            "axios", "lodash", "moment", "date-fns",
+            "zustand", "redux", "mobx", "recoil",
+            "prisma", "mongoose", "typeorm", "sequelize",
+            "jest", "vitest", "mocha", "chai",
+            "tailwindcss", "styled-components", "@emotion/react",
+            "zod", "yup", "joi",
+            "graphql", "apollo", "react-query", "@tanstack/react-query"
+        ];
+
+        for (const lib of Object.keys(deps || {})) {
+            if (majorLibs.includes(lib)) {
+                libs.add(lib);
+            }
+        }
     }
 
     // Python libs
     if (fs.existsSync("requirements.txt")) {
         const lines = fs.readFileSync("requirements.txt", "utf8").split("\n");
-        lines.forEach((line) => {
-            const clean = line.trim().split("==")[0];
-            if (clean) libs.add(clean);
-        });
-    }
+        const majorPyLibs = ["pandas", "numpy", "sqlalchemy", "pytest", "requests"];
 
-    if (fs.existsSync("pyproject.toml")) {
-        libs.add("Python - pyproject");
+        lines.forEach((line) => {
+            const clean = line.trim().split("==")[0].split(">=")[0].split("<=")[0];
+            if (clean && majorPyLibs.includes(clean)) {
+                libs.add(clean);
+            }
+        });
     }
 
     return Array.from(libs);
@@ -107,23 +147,42 @@ function detectLibraries() {
 
 /** 4. Infer project type */
 function inferProjectType(langs, frameworks, libs) {
-    if (frameworks.includes("Django") || frameworks.includes("Flask") || frameworks.includes("FastAPI"))
+    // Backend frameworks
+    if (frameworks.includes("Django") ||
+        frameworks.includes("Flask") ||
+        frameworks.includes("FastAPI") ||
+        frameworks.includes("Express") ||
+        frameworks.includes("NestJS")) {
         return "backend";
+    }
 
-    if (frameworks.includes("Angular") || frameworks.includes("React") || frameworks.includes("Vue"))
+    // Frontend frameworks
+    if (frameworks.includes("Angular") ||
+        frameworks.includes("React") ||
+        frameworks.includes("Vue") ||
+        frameworks.includes("Svelte")) {
+
+        // Check if also has backend
+        if (frameworks.includes("Next.js") || frameworks.includes("Nuxt")) {
+            return "fullstack";
+        }
         return "frontend";
+    }
 
-    if (langs.includes("JavaScript") && langs.includes("Python"))
-        return "full-stack";
+    // Full-stack indicators
+    if (langs.includes("JavaScript") && langs.includes("Python")) {
+        return "fullstack";
+    }
 
-    if (libs.includes("express"))
-        return "backend";
+    if (frameworks.includes("Next.js") || frameworks.includes("Nuxt")) {
+        return "fullstack";
+    }
 
-    return "unknown";
+    return "general";
 }
 
 /** Main entry */
-export const detectProjectInfo = () => {
+export function detectProjectInfo() {
     const languages = detectLanguages();
     const frameworks = detectFrameworks();
     const libraries = detectLibraries();
@@ -138,6 +197,6 @@ export const detectProjectInfo = () => {
 }
 
 // If run directly from CLI
-if (process.argv[1].includes("detectProjectInfo.js")) {
+if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(JSON.stringify(detectProjectInfo(), null, 2));
 }
