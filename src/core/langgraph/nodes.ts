@@ -53,21 +53,21 @@ async function splitIntoChunks(
             });
 
             // DETECT PROJECT CONTEXT FROM ALL CHUNKS
-            // console.log(`\n Detecting project context...`);
-            // const globalProjectContext = aggregateProjectContext(chunks);
-            // const projectContext = generateContextPrompt(globalProjectContext);
-            // console.log(`Detected Context:\n${projectContext}`);
+            console.log(`\n Detecting project context...`);
+            const globalProjectContext = aggregateProjectContext(chunks);
+            const projectContext = generateContextPrompt(globalProjectContext);
+            console.log(`Detected Context:\n${projectContext}`);
 
             // Sort by priority (review important files first)
-            // chunks.sort((a, b) =>
-            //     getFilePriority(b.filename ?? "") - getFilePriority(a.filename ?? "")
-            // );
+            chunks.sort((a, b) =>
+                getFilePriority(b.filename ?? "") - getFilePriority(a.filename ?? "")
+            );
 
             console.log(`📊 Split into ${chunks.length} chunks (filtered from ${fileSections.length} files)`);
 
             return {
                 chunks,
-                // projectContext,
+                projectContext,
             };
         } else {
             // Single snippet (not a diff)
@@ -98,8 +98,8 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
     console.log(`Reviewing: ${chunkData.filename}`);
 
     // Smart agent selection based on file type
-    // const selectedAgents = selectAgentsForFile(chunkData.filename ?? "", chunkData.content);
-    // console.log(`Using ${selectedAgents.length}/${reviewAgents.length} agents: ${selectedAgents.map(a => a.name).join(', ')}`);
+    const selectedAgents = selectAgentsForFile(chunkData.filename ?? "", chunkData.content);
+    console.log(`Using ${selectedAgents.length}/${reviewAgents.length} agents: ${selectedAgents.map(a => a.name).join(', ')}`);
 
     try {
         // Run selected agents in parallel
@@ -110,7 +110,7 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
                         messages: [
                             {
                                 role: "user",
-                                content: chunkData.content
+                                content: `${projectContext}\nDIFF CODE:\n${chunkData.content}`
                             }
                         ]
                     })
