@@ -1,5 +1,5 @@
 import fs from "fs";
-import glob from "glob";
+import { globSync } from "glob";
 
 /** Utility to safely read JSON */
 function readJsonSafe(filePath) {
@@ -36,7 +36,7 @@ function detectLanguages() {
     const detected = new Set();
 
     for (const ext of Object.keys(extMap)) {
-        const files = glob.sync(`**/*.${ext}`, {
+        const files = globSync(`**/*.${ext}`, {
             ignore: ["node_modules/**", "dist/**", "build/**"]
         });
 
