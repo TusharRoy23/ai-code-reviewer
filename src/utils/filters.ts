@@ -6,22 +6,110 @@ export const SIMPLE_CHANGE_THRESHOLD = {
 };
 
 // Token limits for chunking (to avoid API limits)
-export const MAX_CHUNK_TOKENS = 6000; // Leave room for prompt + response
+export const MAX_CHUNK_TOKENS = 6000;
 
 // Files/patterns to skip entirely (no review needed)
-// Only JS specific (For now)
 export const SKIP_PATTERNS = [
-    /\.test\.(ts|js|tsx|jsx)$/,           // Test files
-    /\.spec\.(ts|js|tsx|jsx)$/,           // Spec files
-    /\.(md|txt|csv)$/,                     // Documentation
-    /package(-lock)?\.json$/,              // Package files
-    /pnpm-lock\.yaml$/,                    // Lock files
-    /yarn\.lock$/,                         // Lock files
-    /tsconfig.*\.json$/,                   // TS config
-    /\.(gitignore|gitattributes|editorconfig)$/, // Git files
-    /\.min\.(js|css)$/,                    // Minified files
-    /\.map$/,                              // Source maps
-    /dist\//,                              // Build output
-    /build\//,                             // Build output
-    /node_modules\//,                      // Dependencies
+    // ---- JS/TS ----
+    /\.test\.(ts|js|tsx|jsx)$/,
+    /\.spec\.(ts|js|tsx|jsx)$/,
+    /\.(md|txt|csv|rst)$/,
+    /package(-lock)?\.json$/,
+    /pnpm-lock\.yaml$/,
+    /yarn\.lock$/,
+    /tsconfig.*\.json$/,
+    /\.min\.(js|css)$/,
+    /\.map$/,
+    /dist\//,
+    /build\//,
+    /node_modules\//,
+
+    // ---- Python ----
+    /__pycache__\//,
+    /\.pyc$/,
+    /\.pyo$/,
+    /requirements(-dev)?\.txt$/,
+    /poetry\.lock$/,
+    /Pipfile(\.lock)?$/,
+    /setup\.py$/,
+    /venv\//,
+    /env\//,
+
+    // ---- Java / Kotlin ----
+    /target\//,
+    /build\//,
+    /\.class$/,
+    /\.jar$/,
+    /\.war$/,
+    /\.ear$/,
+    /pom\.xml$/,
+    /gradle\.properties$/,
+    /gradlew(\.bat)?$/,
+
+    // ---- Go ----
+    /go\.mod$/,
+    /go\.sum$/,
+    /vendor\//,
+    /\.exe$/, // from go builds
+    /bin\//,
+
+    // ---- PHP / Laravel ----
+    /vendor\//,
+    /composer\.lock$/,
+    /\.blade\.php$/, // templates (not code review target usually)
+    /storage\//,
+    /bootstrap\/cache\//,
+
+    // ---- Ruby / Rails ----
+    /Gemfile(\.lock)?$/,
+    /tmp\//,
+    /log\//,
+    /vendor\//,
+    /db\/schema\.rb/,
+
+    // ---- Rust ----
+    /Cargo\.lock$/,
+    /target\//,
+
+    // ---- C# / .NET ----
+    /bin\//,
+    /obj\//,
+    /\.csproj$/,
+    /\.sln$/,
+
+    // ---- C/C++ ----
+    /\.o$/,
+    /\.so$/,
+    /\.dll$/,
+    /build\//,
+    /CMakeCache\.txt/,
+    /CMakeFiles\//,
+
+    // ---- Frontend frameworks ----
+    /\.next\//,     // Next.js build
+    /\.nuxt\//,     // Nuxt build
+    /out\//,        // Next.js static output
+    /public\//,     // Next, Laravel, Nuxt public assets
+    /coverage\//,
+    /storybook-static\//,
+
+    // ---- Mobile ----
+    /android\/build\//,
+    /ios\/build\//,
+    /ios\/Pods\//,
+
+    // ---- Docker / CI ----
+    /Dockerfile$/,
+    /docker-compose\.ya?ml$/,
+    /\.github\/workflows\//, // you may or may not skip CI files
+
+    // ---- General binary / artifacts ----
+    /\.zip$/,
+    /\.tar\.gz$/,
+    /\.png$/,
+    /\.jpg$/,
+    /\.jpeg$/,
+    /\.svg$/,
+    /\.ico$/,
+    /\.pdf$/,
 ];

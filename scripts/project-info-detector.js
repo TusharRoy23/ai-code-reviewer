@@ -111,7 +111,7 @@ function detectLibraries() {
             ...pkg.devDependencies,
         };
 
-        // Only include major libraries, not everything
+        // Only included major libraries, not everything
         const majorLibs = [
             "axios", "lodash", "moment", "date-fns",
             "zustand", "redux", "mobx", "recoil",
