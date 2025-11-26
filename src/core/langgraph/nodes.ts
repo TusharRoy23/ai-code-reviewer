@@ -35,13 +35,13 @@ async function splitIntoChunks(
 
                 // Skip unwanted files
                 if (shouldSkipFile(filename)) {
-                    console.log(`⏭️  Skipping: ${filename} (excluded pattern)`);
+                    // console.log(`⏭️  Skipping: ${filename} (excluded pattern)`);
                     return;
                 }
 
                 // Skip simple changes
                 if (isSimpleChange(content)) {
-                    console.log(`⏭️  Skipping: ${filename} (simple change)`);
+                    // console.log(`⏭️  Skipping: ${filename} (simple change)`);
                     return;
                 }
 
@@ -53,21 +53,21 @@ async function splitIntoChunks(
             });
 
             // DETECT PROJECT CONTEXT FROM ALL CHUNKS
-            console.log(`\n Detecting project context...`);
-            const globalProjectContext = aggregateProjectContext(chunks);
-            const projectContext = generateContextPrompt(globalProjectContext);
-            console.log(`Detected Context:\n${projectContext}`);
+            // console.log(`\n Detecting project context...`);
+            // const globalProjectContext = aggregateProjectContext(chunks);
+            // const projectContext = generateContextPrompt(globalProjectContext);
+            // console.log(`Detected Context:\n${projectContext}`);
 
             // Sort by priority (review important files first)
             chunks.sort((a, b) =>
                 getFilePriority(b.filename ?? "") - getFilePriority(a.filename ?? "")
             );
 
-            console.log(`📊 Split into ${chunks.length} chunks (filtered from ${fileSections.length} files)`);
+            // console.log(`📊 Split into ${chunks.length} chunks (filtered from ${fileSections.length} files)`);
 
             return {
                 chunks,
-                projectContext,
+                // projectContext,
             };
         } else {
             // Single snippet (not a diff)
@@ -95,11 +95,11 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
         return { reviews: [] };
     }
 
-    console.log(`Reviewing: ${chunkData.filename}`);
+    // console.log(`Reviewing: ${chunkData.filename}`);
 
     // Smart agent selection based on file type
     const selectedAgents = selectAgentsForFile(chunkData.filename ?? "", chunkData.content);
-    console.log(`Using ${selectedAgents.length}/${reviewAgents.length} agents: ${selectedAgents.map(a => a.name).join(', ')}`);
+    // console.log(`Using ${selectedAgents.length}/${reviewAgents.length} agents: ${selectedAgents.map(a => a.name).join(', ')}`);
 
     try {
         // Run selected agents in parallel
@@ -110,7 +110,7 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
                         messages: [
                             {
                                 role: "user",
-                                content: `${projectContext}\nDIFF CODE:\n${chunkData.content}`
+                                content: `${chunkData.content}`
                             }
                         ]
                     })
@@ -144,7 +144,7 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
                             console.log(`  🔽 ${agentName}: filtered ${beforeFilter - issues.length} low/medium severity issues`);
                         }
 
-                        console.log(`  ✅ ${agentName}: found ${issues.length} high/critical issues`);
+                        // console.log(`  ✅ ${agentName}: found ${issues.length} high/critical issues`);
                     } catch (err) {
                         console.error(`  ❌ Failed to parse ${agentName} output:`, err);
                         // Log the problematic content for debugging
@@ -168,7 +168,7 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
         const deduplicatedReviews = deduplicateIssues(filteredAllReviews);
 
         if (deduplicatedReviews.length === 0) {
-            console.log(`No significant issues found in ${chunkData.filename}`);
+            // console.log(`No significant issues found in ${chunkData.filename}`);
         }
 
         return {
