@@ -1,4 +1,5 @@
 import { createAgent } from "langchain";
+import { z } from "zod";
 
 interface AgentOptions {
   name: string;
@@ -7,48 +8,58 @@ interface AgentOptions {
   tools?: any[];
 }
 
+const IssueSchema = z.object({
+  type: z.string(),
+  description: z.string(),
+  severity: z.enum(["low", "medium", "high", "critical"]),
+  recommendation: z.string(),
+  lineStart: z.number(),
+  lineEnd: z.number(),
+});
+
+const ReviewSchema = z.object({
+  issues: z.array(IssueSchema),
+});
+
 export function makeAgent({
   name,
   model = "gpt-4o-mini",
   systemPrompt,
   tools = [],
 }: AgentOptions) {
-  const prompt = `
-You are a senior software engineering analysis agent.
+  let projectInfo = '';
+  if (process.env.LANGUAGES) {
+    projectInfo += `LANGUAGE: ${process.env.LANGUAGES}\n`
+  }
+  if (process.env.FRAMEWORKS) {
+    projectInfo += `FRAMEWORKS: ${process.env.FRAMEWORKS}\n`
+  }
+  if (process.env.LIBRARIES) {
+    projectInfo += `LIBRARIES: ${process.env.LIBRARIES}\n`
+  }
+  if (process.env.PROJECT_TYPE) {
+    projectInfo += `PROJECT TYPE: ${process.env.PROJECT_TYPE}\n`
+  }
+  if (projectInfo != '') {
+    projectInfo = `Project Info: \n${projectInfo}`
+  }
 
-You are reviewing a GIT DIFF. The code is partial and may not include full context.
-
-Rules:
-1. Review ONLY the code visible in the diff.
-2. Do NOT assume missing code, missing tests, or missing context.
-3. Report issues only if they are explicitly visible in the diff.
-4. Return exactly one JSON object with the following shape:
-
-{
-  "issues": [
-    {
-      "type": "string",
-      "description": "string",
-      "severity": "low | medium | high | critical",
-      "recommendation": "string",
-      "lineStart": number,
-      "lineEnd": number
-    }
-  ]
-}
-
-5. If there are no issues, return {"issues": []}.
-6. Keep descriptions and recommendations short and direct.
-7. You MUST respond with a **valid JSON object only**. Do NOT include markdown code fences. Do NOT include text before or after.
-8. Your focus areas:
-${systemPrompt}
-    `.trim();
+  const prompt = `${systemPrompt}
+  You are reviewing a GIT DIFF.
+  Rules:
+  1. Review ONLY the code that explicitly visible in the GIT DIFF.
+  2. Do NOT assume missing code, tests, or missing context.
+  3. Return output as JSON and if no issue, return empty array.
+  4. Keep "description" and "recommendation" from output schema short and direct.\n
+  ${projectInfo}
+  `.trim();
 
   return createAgent({
     name,
     model,
     tools,
-    systemPrompt: prompt
+    systemPrompt: prompt,
+    responseFormat: ReviewSchema
   });
 }
 

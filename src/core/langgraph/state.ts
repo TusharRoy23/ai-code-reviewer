@@ -56,5 +56,9 @@ export const ReviewState = Annotation.Root({
         reducer: (x: any, y: any) => y ?? x,
         default: () => "",
     }),
-    // The beautiful markdown comment ready to post on GitHub
+    // Prompt for Project context
+    projectContext: Annotation<string>({
+        reducer: (x: any, y: any) => y ?? x,
+        default: () => ""
+    })
 });

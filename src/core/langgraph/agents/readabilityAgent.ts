@@ -1,14 +1,15 @@
-import { makeAgent } from "./makeAgent.js";
+import { makeAgent } from "./makeAgent.ts";
 
 const prompt = `You are a senior code readability expert.
-Review the code for:
+Audit:
 - Naming clarity
 - Function length / complexity
 - Cohesion and single responsibility
-- Dead code, unused vars
+- Dead code, unused variables
 - Consistent patterns
 - Comment quality
 - Separation of concerns
+- Type mismatches
 `;
 
 export const readabilityAgent = makeAgent({

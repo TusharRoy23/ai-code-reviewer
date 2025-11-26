@@ -1,5 +1,5 @@
 import express from "express";
-import { codeReviewGraph } from "./core/langgraph/graph.js";
+import { codeReviewGraph } from "./core/langgraph/graph.ts";
 
 const app = express();
 

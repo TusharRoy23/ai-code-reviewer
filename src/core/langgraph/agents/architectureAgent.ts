@@ -1,7 +1,7 @@
-import { makeAgent } from "./makeAgent.js";
+import { makeAgent } from "./makeAgent.ts";
 
 const prompt = `You are a senior software architect.
-Evaluate:
+Audit:
 - Modularization
 - Separation of concerns
 - File structure and domain boundaries
