@@ -222,6 +222,8 @@ runs:
         if node ${{ github.action_path }}/review-bot.js pr.filtered.diff > review.md; then
           echo "AI review completed successfully"
           echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "Reviewing Output"
+          cat review.md
         else
           echo "AI review failed"
           exit 1
@@ -230,24 +232,24 @@ runs:
     # ------------------------------------------------------
     # 4. POST REVIEW COMMENTS
     # ------------------------------------------------------
-    - name: Post review comments
-      if: |
-        steps.check.outputs.skip != 'true' && 
-        steps.review.outputs.has_changes == 'true'
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-        REVIEW_MODE: ${{ inputs.review-mode }}
-      run: |
-        echo "Posting review comments to PR..."
+    # - name: Post review comments
+    #   if: |
+    #     steps.check.outputs.skip != 'true' &&
+    #     steps.review.outputs.has_changes == 'true'
+    #   shell: bash
+    #   env:
+    #     GITHUB_TOKEN: ${{ github.token }}
+    #     REVIEW_MODE: ${{ inputs.review-mode }}
+    #   run: |
+    #     echo "Posting review comments to PR..."
 
-        if [ "$REVIEW_MODE" = "incremental" ]; then
-          echo "Mode: Incremental (latest commit only)"
-        else
-          echo "Mode: Full PR review"
-        fi
+    #     if [ "$REVIEW_MODE" = "incremental" ]; then
+    #       echo "Mode: Incremental (latest commit only)"
+    #     else
+    #       echo "Mode: Full PR review"
+    #     fi
 
-        node ${{ github.action_path }}/post-review.js review.md
+    #     node ${{ github.action_path }}/post-review.js review.md
 
     # ------------------------------------------------------
     # 5. CLEANUP
