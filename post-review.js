@@ -32,7 +32,7 @@ async function main() {
             return;
         }
         console.log('reviewContent: ', reviewContent);
-
+        let reviews;
         // Parse reviews
         try {
             // reviews = JSON.parse(reviewContent);
