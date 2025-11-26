@@ -31,7 +31,6 @@ async function main() {
             console.log('No review content found');
             return;
         }
-        console.log('reviewContent: ', reviewContent);
         let reviews;
         // Parse reviews
         try {
@@ -39,7 +38,6 @@ async function main() {
             const sanitized = reviewContent.replace(/```(json|diff)?/g, '').trim()
             reviews = JSON.parse(sanitized);
             console.log('reviews: ', reviews);
-            console.log('typeof reviews: ', typeof reviews);
 
             // Validate structure
             if (!Array.isArray(reviews)) {
