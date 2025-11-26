@@ -31,14 +31,31 @@ async function main() {
             console.log('No review content found');
             return;
         }
+        console.log('reviewContent: ', reviewContent);
 
         // Parse reviews
-        let reviews;
         try {
             reviews = JSON.parse(reviewContent);
+
+            // Validate structure
+            if (!Array.isArray(reviews)) {
+                throw new Error('Reviews must be an array');
+            }
+
+            console.log(`📦 Parsed ${reviews.length} review chunks`);
         } catch (e) {
-            console.error('Failed to parse review file as JSON:', e.message);
-            console.error('Content preview:', reviewContent.substring(0, 200));
+            console.error('❌ Failed to parse review file as JSON:', e.message);
+            console.error('Content preview:', reviewContent.substring(0, 500));
+            console.error('Content type:', typeof reviewContent);
+
+            // Try to show where parsing failed
+            try {
+                const lines = reviewContent.split('\n');
+                console.error('Total lines:', lines.length);
+                console.error('First line:', lines[0]);
+                console.error('Last line:', lines[lines.length - 1]);
+            } catch { }
+
             throw e;
         }
 

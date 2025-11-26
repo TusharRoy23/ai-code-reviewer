@@ -141,7 +141,7 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
                         );
 
                         if (beforeFilter !== issues.length) {
-                            console.log(`  🔽 ${agentName}: filtered ${beforeFilter - issues.length} low/medium severity issues`);
+                            // console.log(`  🔽 ${agentName}: filtered ${beforeFilter - issues.length} low/medium severity issues`);
                         }
 
                         // console.log(`  ✅ ${agentName}: found ${issues.length} high/critical issues`);
@@ -169,6 +169,10 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
 
         if (deduplicatedReviews.length === 0) {
             // console.log(`No significant issues found in ${chunkData.filename}`);
+        }
+
+        if (deduplicatedReviews.length == 0) {
+            return {};
         }
 
         return {
