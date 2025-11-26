@@ -197,6 +197,22 @@ runs:
           }' pr.filtered.diff
         fi
 
+    - name: Detect project info
+      id: projectinfo
+      shell: bash
+      run: |
+        INFO=$(node scripts/project-info-detector.js)
+
+        LANGS=$(echo "$INFO" | jq -r '.languages | join(",")')
+        FRAMES=$(echo "$INFO" | jq -r '.frameworks | join(",")')
+        LIBS=$(echo "$INFO" | jq -r '.libraries | join(",")')
+        TYPE=$(echo "$INFO" | jq -r '.projectType')
+
+        echo "LANGUAGES=$LANGS" >> $GITHUB_ENV
+        echo "FRAMEWORKS=$FRAMES" >> $GITHUB_ENV
+        echo "LIBRARIES=$LIBS" >> $GITHUB_ENV
+        echo "PROJECT_TYPE=$TYPE" >> $GITHUB_ENV
+
     # ------------------------------------------------------
     # 3. RUN AI REVIEW
     # ------------------------------------------------------
@@ -210,6 +226,10 @@ runs:
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         MODEL: ${{ inputs.model }}
         MIN_SEVERITY: ${{ inputs.min-severity }}
+        LANGUAGES: ${{ env.LANGUAGES }}
+        FRAMEWORKS: ${{ env.FRAMEWORKS }}
+        LIBRARIES: ${{ env.LIBRARIES }}
+        PROJECT_TYPE: ${{ env.PROJECT_TYPE }}
       run: |
         if [ ! -s pr.filtered.diff ]; then
           echo "No meaningful code changes found. Skipping AI review."
@@ -218,8 +238,12 @@ runs:
         fi
 
         echo "Running AI code review with model: $MODEL"
+        echo "Detected languages: $LANGUAGES"
+        echo "Detected frameworks: $FRAMEWORKS"
+        echo "Detected libraries: $LIBRARIES"
+        echo "Detected project type: $PROJECT_TYPE"
 
-        if node ${{ github.action_path }}/review-bot.js pr.filtered.diff > review.md; then
+        if node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.md; then
           echo "AI review completed successfully"
           echo "has_changes=true" >> $GITHUB_OUTPUT
           echo "Reviewing Output"
@@ -249,7 +273,7 @@ runs:
           echo "Mode: Full PR review"
         fi
 
-        node ${{ github.action_path }}/post-review.js review.md
+        node ${{ github.action_path }}/scripts/post-review.js review.md
 
     # ------------------------------------------------------
     # 5. CLEANUP

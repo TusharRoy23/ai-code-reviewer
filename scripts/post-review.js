@@ -3,12 +3,8 @@
  * Usage: node post-review.js <review-file-path>
  */
 
-// const fs = require('fs');
-// const github = require('@actions/github');
-// const core = require('@actions/core');
 import fs from "fs";
 import github from "@actions/github";
-// import core from "@actions/core";
 
 async function main() {
     try {
@@ -37,7 +33,6 @@ async function main() {
             // Make sure the reviewContent is JSON safe
             const sanitized = reviewContent.replace(/```(json|diff)?/g, '').trim()
             reviews = JSON.parse(sanitized);
-            console.log('reviews: ', reviews);
 
             // Validate structure
             if (!Array.isArray(reviews)) {

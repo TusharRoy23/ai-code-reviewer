@@ -35,13 +35,11 @@ async function splitIntoChunks(
 
                 // Skip unwanted files
                 if (shouldSkipFile(filename)) {
-                    // console.log(`⏭️  Skipping: ${filename} (excluded pattern)`);
                     return;
                 }
 
                 // Skip simple changes
                 if (isSimpleChange(content)) {
-                    // console.log(`⏭️  Skipping: ${filename} (simple change)`);
                     return;
                 }
 
@@ -62,8 +60,6 @@ async function splitIntoChunks(
             chunks.sort((a, b) =>
                 getFilePriority(b.filename ?? "") - getFilePriority(a.filename ?? "")
             );
-
-            // console.log(`📊 Split into ${chunks.length} chunks (filtered from ${fileSections.length} files)`);
 
             return {
                 chunks,
@@ -99,12 +95,11 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
 
     // Smart agent selection based on file type
     const selectedAgents = selectAgentsForFile(chunkData.filename ?? "", chunkData.content);
-    // console.log(`Using ${selectedAgents.length}/${reviewAgents.length} agents: ${selectedAgents.map(a => a.name).join(', ')}`);
 
     try {
         // Run selected agents in parallel
         const results = await Promise.allSettled(
-            reviewAgents.map(({ agent }) =>
+            selectedAgents.map(({ agent }) =>
                 agentConcurrency(() =>
                     agent.invoke({
                         messages: [
