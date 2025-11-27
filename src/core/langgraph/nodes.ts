@@ -1,19 +1,9 @@
 import { ReviewState, type Chunk } from "./state.ts";
-import { ChatOpenAI } from "@langchain/openai";
 import { agentConcurrency } from "../../config/concurrency.ts";
 import { deduplicateIssues, getFilePriority, isSimpleChange, reviewAgents, selectAgentsForFile, shouldSkipFile } from "../../utils/helper.ts";
-import { aggregateProjectContext, generateContextPrompt } from "../../utils/context.ts";
 
 // ──────────────────────────────
-// 1. LLM SETUP
-// ──────────────────────────────
-const llm = new ChatOpenAI({
-    model: "gpt-4o-mini", // change to "claude-3-5-sonnet-20241022" or "grok-4" as you wish
-    temperature: 0.2,
-});
-
-// ──────────────────────────────
-// 2. SPLIT NODE – turns raw input into chunks
+// SPLIT NODE – turns raw input into chunks
 // ──────────────────────────────
 async function splitIntoChunks(
     state: typeof ReviewState.State
@@ -50,23 +40,15 @@ async function splitIntoChunks(
                 });
             });
 
-            // DETECT PROJECT CONTEXT FROM ALL CHUNKS
-            // console.log(`\n Detecting project context...`);
-            // const globalProjectContext = aggregateProjectContext(chunks);
-            // const projectContext = generateContextPrompt(globalProjectContext);
-            // console.log(`Detected Context:\n${projectContext}`);
-
             // Sort by priority (review important files first)
             chunks.sort((a, b) =>
                 getFilePriority(b.filename ?? "") - getFilePriority(a.filename ?? "")
             );
 
             return {
-                chunks,
-                // projectContext,
+                chunks
             };
         } else {
-            // Single snippet (not a diff)
             chunks.push({
                 id: "0",
                 filename: "snippet.txt",
@@ -75,23 +57,20 @@ async function splitIntoChunks(
             return { chunks };
         }
     } catch (error) {
-        console.log('node error: ', error);
         return { chunks: [] };
     }
 }
 
 // ──────────────────────────────
-// 3. REVIEW EACH CHUNKS NODE
+// REVIEW EACH CHUNKS NODE
 // ──────────────────────────────
-async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string }) {
-    const { chunkData, projectContext } = state;
+async function reviewEachChunk(state: { chunkData: Chunk }) {
+    const { chunkData } = state;
 
     if (!chunkData) {
         console.error("No chunk data provided");
         return { reviews: [] };
     }
-
-    // console.log(`Reviewing: ${chunkData.filename}`);
 
     // Smart agent selection based on file type
     const selectedAgents = selectAgentsForFile(chunkData.filename ?? "", chunkData.content);
@@ -112,7 +91,6 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
                 )
             )
         );
-        // ${projectContext}\nDIFF CODE:\n${chunkData.content}`
 
         const allReviews = results.map((res, index) => {
             const agentName = reviewAgents.at(index)?.name;
@@ -135,15 +113,10 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
                             issue.severity === 'critical'
                         );
 
-                        if (beforeFilter !== issues.length) {
-                            // console.log(`  🔽 ${agentName}: filtered ${beforeFilter - issues.length} low/medium severity issues`);
-                        }
-
-                        // console.log(`  ✅ ${agentName}: found ${issues.length} high/critical issues`);
                     } catch (err) {
-                        console.error(`  ❌ Failed to parse ${agentName} output:`, err);
+                        console.error(`Failed to parse ${agentName} output:`, err);
                         // Log the problematic content for debugging
-                        console.error(`  Raw content: ${lastContent.substring(0, 200)}...`);
+                        console.error(`Raw content: ${lastContent.substring(0, 200)}...`);
                     }
                 }
                 return {
@@ -161,11 +134,6 @@ async function reviewEachChunk(state: { chunkData: Chunk, projectContext: string
 
         // Deduplicate similar issues (reduce noise)
         const deduplicatedReviews = deduplicateIssues(filteredAllReviews);
-
-        if (deduplicatedReviews.length === 0) {
-            // console.log(`No significant issues found in ${chunkData.filename}`);
-        }
-
 
         return {
             reviews: [

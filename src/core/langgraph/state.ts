@@ -38,10 +38,6 @@ export const ReviewState = Annotation.Root({
         reducer: (x: any, y: any) => y ?? x,
         default: () => [],
     }),
-    batchIndex: Annotation<number>({  // Which batch (Ex, 0, 2, 4, 6, ...)
-        reducer: (x: any, y: any) => y ?? x,
-        default: () => 0,
-    }),
 
     reviews: Annotation<Review[]>({
         reducer: (x: any, y: any) => [...(x ?? []), ...(y ?? [])], // concat with the last review,
@@ -55,10 +51,5 @@ export const ReviewState = Annotation.Root({
     finalReview: Annotation<string>({
         reducer: (x: any, y: any) => y ?? x,
         default: () => "",
-    }),
-    // Prompt for Project context
-    projectContext: Annotation<string>({
-        reducer: (x: any, y: any) => y ?? x,
-        default: () => ""
     })
 });

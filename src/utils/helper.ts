@@ -92,12 +92,19 @@ export const getFileType = (filename: string): string => {
         'scala': 'Scala',
         'ex': 'Elixir',
         'exs': 'Elixir',
+        'html': "HTML",
+        'css': "CSS",
+        'scss': "SCSS",
+        'sql': "SQL",
+        'sh': "Shell"
     };
     return typeMap[ext] || ext.toUpperCase();
 }
 
 /**
- * Calculate priority score for a file (higher = more important)
+ * Calculate priority score for a file (1 to 10)
+ * 1 = Lowest
+ * 10 = Highest
  */
 export const getFilePriority = (filename: string): number => {
     // Security-critical files
@@ -121,19 +128,19 @@ export const getFilePriority = (filename: string): number => {
     // Config files
     if (/config|setting/i.test(filename)) return 3;
 
-    // Tests (lowest priority since we skip them anyway)
+    // Tests (lowest priority)
     if (/test|spec/i.test(filename)) return 1;
 
     return 5; // Default priority
 }
 
 /**
- * Select which agents should review this file (smart agent selection)
+ * Smart agent selection to review files
  */
 export const selectAgentsForFile = (filename: string, content: string): typeof reviewAgents => {
     const allAgents = [...reviewAgents];
 
-    // For simple files, use fewer agents to save cost
+    // For simple files, fewer agents have used to save cost
     const tokens = estimateTokens(content);
     if (tokens < 500) {
         // Small files: only security + performance
@@ -144,7 +151,6 @@ export const selectAgentsForFile = (filename: string, content: string): typeof r
 
     // Security-critical files: prioritize security agent
     if (/auth|security|password|token|crypto|login/i.test(filename)) {
-        // Move security to front
         return [
             allAgents.find(a => a.name === 'security')!,
             ...allAgents.filter(a => a.name !== 'security')
@@ -181,7 +187,7 @@ export const selectAgentsForFile = (filename: string, content: string): typeof r
         );
     }
 
-    // Default: use all agents
+    // Default: All agents
     return allAgents;
 }
 
@@ -221,13 +227,13 @@ export const deduplicateIssues = (reviews: any[]): any[] => {
 
     for (const review of reviews) {
         for (const issue of review.issues) {
-            // Create a more robust signature
+            // Robust signature
             const signature = `${issue.lineStart}-${issue.lineEnd}:${normalizeIssueType(issue.type)}`;
 
             const existing = seen.get(signature);
 
             if (!existing) {
-                // First time seeing this issue
+                // If issue not exists
                 seen.set(signature, { ...issue, agentName: review.type });
             } else {
                 // Duplicate found - keep the one with higher severity
@@ -258,26 +264,4 @@ export const deduplicateIssues = (reviews: any[]): any[] => {
     }
 
     return deduplicated;
-}
-
-// Helper: Get most common value from array
-export const getMostCommon = <T>(arr: T[]): T | undefined => {
-    if (arr.length === 0) return undefined;
-
-    const counts = new Map<T, number>();
-    for (const item of arr) {
-        counts.set(item, (counts.get(item) || 0) + 1);
-    }
-
-    let maxCount = 0;
-    let mostCommon: T | undefined;
-
-    for (const [item, count] of counts) {
-        if (count > maxCount) {
-            maxCount = count;
-            mostCommon = item;
-        }
-    }
-
-    return mostCommon;
 }
