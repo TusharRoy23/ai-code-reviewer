@@ -1,14 +1,6 @@
-import express from "express";
-import { codeReviewGraph } from "./core/langgraph/graph.ts";
+import config from "./config/config.ts";
+import "./config/concurrency.ts";
+import { server } from "./server.ts";
 
-const app = express();
-
-app.use(express.json());
-app.post("/review", async (req, res) => {
-    const { code } = req.body;
-    const graphResult = await codeReviewGraph.invoke({
-        rawInput: code
-    });
-    res.send({ message: graphResult.reviews });
-});
-export default app;
+const port: number = Number(config.port) || 8000;
+server.build().listen(port, () => console.log(`Server is running on port ${port}`));
