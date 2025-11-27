@@ -1,5 +1,25 @@
 import { readFileSync } from "fs";
-import { codeReviewGraph } from "../dist/core/langgraph/graph.js";
+import axios from "axios";
+// import { codeReviewGraph } from "../dist/core/langgraph/graph.js";
+
+const API_BASE_URL = `http://localhost:8000`;
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json"
+  },
+  withCredentials: true,
+});
+
+apiClient.interceptors.request.use(
+  async (config) => config,
+  (error) => Promise.reject(error)
+)
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => Promise.reject(error)
+);
 
 async function main() {
   const diffRaw = readFileSync(process.argv[2] || "pr.diff", "utf-8").trim();
@@ -14,7 +34,9 @@ async function main() {
   // remove outer quotes so LangGraph receives raw text but escaped
   const escapedDiff = JSON.parse(diff);
 
-  const result = await codeReviewGraph.invoke({ rawInput: escapedDiff });
+  const result = await apiClient.post(`/review`, { code: escapedDiff });
+
+  // const result = await codeReviewGraph.invoke({ rawInput: escapedDiff });
   console.log(JSON.stringify(result.reviews || []));
 }
 
