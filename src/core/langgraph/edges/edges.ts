@@ -1,5 +1,5 @@
 import { Send } from "@langchain/langgraph";
-import type { ReviewState } from "./states/state.ts";
+import type { ReviewState } from "../states/state.ts";
 
 const routeChunksToReview = (state: typeof ReviewState.State) => {
     const { chunks } = state;
