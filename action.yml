@@ -286,23 +286,22 @@ runs:
         echo "   "
 
         # Run review with tee to see output
-        if node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.md; then
+        if node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.json; then
           echo ""
           echo "AI review completed successfully"
           
-          # Show statistics
-          if [ -f review.md ]; then
-            SIZE=$(wc -c < review.md)
-            LINES=$(wc -l < review.md)
-            echo "Generated review: $SIZE bytes, $LINES lines"
-            cat -A review.md
-            # Validate JSON
-            if cat review.md | jq empty 2>/dev/null; then
-              CHUNKS=$(cat review.md | jq 'length')
-              echo "Review chunks: $CHUNKS"
-            else
-              echo "Output is not valid JSON"
-            fi
+          # Check if review.json is valid JSON
+          if jq empty review.json 2>/dev/null; then
+            echo "Review completed successfully"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            
+            # Show review for debugging in logs
+            echo "Review output:"
+            cat review.json
+          else
+            echo "Invalid JSON in review output"
+            cat review.json
+            exit 1
           fi
           
           echo "has_changes=true" >> $GITHUB_OUTPUT
@@ -331,7 +330,7 @@ runs:
           echo "Mode: Full PR review"
         fi
 
-        node ${{ github.action_path }}/scripts/post-review.js review.md
+        node ${{ github.action_path }}/scripts/post-review.js review.json
 
     # ------------------------------------------------------
     # 5. CLEANUP
@@ -341,5 +340,5 @@ runs:
       shell: bash
       run: |
         echo "Cleaning up temporary files..."
-        rm -f pr.diff pr.filtered.diff alldiff.tmp review.md
+        rm -f pr.diff pr.filtered.diff alldiff.tmp review.json
         echo "Cleanup complete"

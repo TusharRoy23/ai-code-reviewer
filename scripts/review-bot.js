@@ -4,6 +4,16 @@ import * as core from "@actions/core";
 
 const API_BASE_URL = `https://ai-code-reviewer-restless-violet-7974.fly.dev`;
 
+const debugLog = (message) => {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  try {
+    writeFileSync("review-bot.debug.log", logMessage, { flag: "a" });
+  } catch (error) {
+    // Silently fail if we can't write debug log
+  }
+};
+
 // Function to get GitHub OIDC token
 async function getGitHubOIDCToken() {
   try {
@@ -17,7 +27,7 @@ async function getGitHubOIDCToken() {
 
     return token;
   } catch (error) {
-    console.error("❌ Error obtaining GitHub OIDC token:", error.message);
+    debugLog("❌ Error obtaining GitHub OIDC token:", error.message);
     throw error;
   }
 }
@@ -43,7 +53,7 @@ apiClient.interceptors.request.use(
 
       return config;
     } catch (error) {
-      console.error("❌ Failed to add OIDC token to request:", error.message);
+      debugLog("❌ Failed to add OIDC token to request:", error.message);
       throw error;
     }
   },
@@ -55,11 +65,11 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.error("❌ Unauthorized: Invalid or expired OIDC token");
+      debugLog("❌ Unauthorized: Invalid or expired OIDC token");
     } else if (error.response?.status === 403) {
-      console.error("❌ Forbidden: Not allowed to access this resource");
+      debugLog("❌ Forbidden: Not allowed to access this resource");
     } else if (error.response?.status === 503) {
-      console.error("❌ Service Unavailable: Backend service temporarily down");
+      debugLog("❌ Service Unavailable: Backend service temporarily down");
     }
     return Promise.reject(error);
   }
@@ -71,6 +81,7 @@ async function main() {
     const diffRaw = readFileSync(diffPath, "utf-8").trim();
 
     if (!diffRaw) {
+      console.log(JSON.stringify([]));
       return;
     }
 
@@ -83,16 +94,15 @@ async function main() {
     const result = await apiClient.post(`/review`, {
       code: escapedDiff
     });
-    // console.log(JSON.stringify(result.data?.data || []));
-    process.stdout.write(JSON.stringify(result.data?.data || []));
+    console.log(JSON.stringify(result.data?.data || []));
 
   } catch (error) {
-    console.error("❌ Review failed:", error.response?.data || error.message);
+    debugLog("❌ Review failed:", error.response?.data || error.message);
     process.exit(1);
   }
 }
 
 main().catch(err => {
-  console.error("❌ Fatal error:", err.message);
+  debugLog("❌ Fatal error:", err.message);
   process.exit(1);
 });

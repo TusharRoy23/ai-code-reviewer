@@ -20,7 +20,8 @@ export class ReviewerRepository implements IReviewerRepository {
             const result = await this.graph.invoke({
                 rawInput: payload.code
             }, { configurable: { thread_id: uuidv4() } });
-            return result.reviews?.filter((review: Review) => review?.issues?.length > 0);
+            const data = result.reviews?.filter((review: Review) => review?.issues?.length > 0);
+            return data;
         } catch (error) {
             throw error;
         }
