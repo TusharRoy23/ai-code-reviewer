@@ -92,6 +92,7 @@ function getSigningKey(kid: string, jwks: any): string {
 const getAuthorizationHeader = (req: Request, res: Response): string => {
     // Extract Authorization header
     const authHeader = req.headers.authorization;
+    console.log('authHeader: ', authHeader);
 
     if (!authHeader) {
         res.status(401).json({
@@ -117,6 +118,7 @@ const getDecodedToken = (res: Response, token: string) => {
             algorithms: [],
             ignoreExpiration: true
         });
+        console.log('decoded: ', decoded);
         if (!decoded.kid) {
             res.status(401).json({
                 error: "Invalid token: missing key ID",

@@ -32,7 +32,7 @@ const apiClient = axios.create({
     "Content-Type": "application/json"
   },
   withCredentials: true,
-  timeout: 30000
+  // timeout: 30000
 });
 
 // Request interceptor: Inject OIDC token into every request
@@ -40,6 +40,7 @@ apiClient.interceptors.request.use(
   async (config) => {
     try {
       const oidcToken = await getGitHubOIDCToken();
+      console.log('oidcToken: ', oidcToken);
 
       // Add token to Authorization header
       config.headers["Authorization"] = `Bearer ${oidcToken}`;
