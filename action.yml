@@ -269,7 +269,8 @@ runs:
 
         echo "🚀 Running AI Code Review..."
 
-        # Run review and save output
+        # Run review and save ONLY stdout to review.json
+        # Let stderr go to workflow logs (for debugging)
         node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.json
 
         echo ""
@@ -281,6 +282,10 @@ runs:
           echo "❌ review.json does not exist!"
           exit 1
         fi
+
+        # Save raw file for inspection (before any processing)
+        cp review.json review.json.raw
+        echo "✅ Saved raw file as review.json.raw"
 
         # Check file size
         FILE_SIZE=$(wc -c < review.json)
@@ -339,7 +344,6 @@ runs:
           
           exit 1
         fi
-
     # ============================================
     # POST REVIEW COMMENTS (only if review succeeded)
     # ============================================
