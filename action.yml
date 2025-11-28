@@ -271,7 +271,7 @@ runs:
 
         # Run review and save ONLY stdout to review.json
         # Let stderr go to workflow logs (for debugging)
-        node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.json
+        node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff | grep -v '^::' > review.json
 
         echo ""
         echo "📊 DEBUG: Checking review.json..."
