@@ -4,8 +4,9 @@ import { TYPES } from "../../../config/types.ts";
 import type { IReviewerService } from "../interface/IReviewer.service.ts";
 import { controller, httpPost, requestBody } from "inversify-express-utils";
 import type { ReviewPayloadType } from "../dto/review-payload.dto.ts";
+import { VerifyGitHubOIDCMiddleware } from "../../../middleware/github-oidc.middleware.ts";
 
-@controller("/review")
+@controller("/review", VerifyGitHubOIDCMiddleware)
 export class ReviewerController {
     constructor(
         @inject(TYPES.IReviewerService) private readonly reviewerService: IReviewerService

@@ -9,6 +9,7 @@ import { CodeReviewerGraph } from "../core/langgraph/graph.ts";
 import type { IReviewerNodes } from "../core/langgraph/interface/IReviewer.nodes.ts";
 import { ReviewerNodes } from "../core/langgraph/nodes/reviewer.node.ts";
 import type { IGraphBuilder } from "../core/langgraph/interface/IGraphBuilder.ts";
+import { VerifyGitHubOIDCMiddleware } from "../middleware/github-oidc.middleware.ts";
 
 const container = new Container({ defaultScope: "Singleton" });
 /* Reviewer */
@@ -18,5 +19,8 @@ container.bind<IReviewerService>(TYPES.IReviewerService).to(ReviewerService);
 /* LangGraph */
 container.bind<IGraphBuilder>(TYPES.IGraphBuilder).to(CodeReviewerGraph);
 container.bind<IReviewerNodes>(TYPES.IReviewerNodes).to(ReviewerNodes);
+
+/* Middleware */
+container.bind<VerifyGitHubOIDCMiddleware>(VerifyGitHubOIDCMiddleware).toSelf();
 
 export default container;

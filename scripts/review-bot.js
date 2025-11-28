@@ -37,7 +37,7 @@ async function main() {
   const result = await apiClient.post(`/review`, { code: escapedDiff });
 
   // const result = await codeReviewGraph.invoke({ rawInput: escapedDiff });
-  console.log(JSON.stringify(result.reviews || []));
+  console.log(JSON.stringify(result.data || []));
 }
 
 main().catch(err => {
