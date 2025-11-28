@@ -270,7 +270,7 @@ runs:
         echo "🚀 Running AI Code Review..."
 
         # Run review and save output
-        node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.json 2>&1
+        node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.json
 
         echo ""
         echo "📊 DEBUG: Checking review.json..."
