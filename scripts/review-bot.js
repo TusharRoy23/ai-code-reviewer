@@ -94,7 +94,33 @@ async function main() {
     const result = await apiClient.post(`/review`, {
       code: escapedDiff
     });
-    console.log(JSON.stringify(result.data?.data || []));
+    debugLog("✅ AI review completed successfully");
+
+    // Validate response data
+    const responseData = result.data?.data;
+
+    // If response is empty, output empty array
+    if (!responseData) {
+      debugLog("⚠️  API returned no data, outputting empty array");
+      console.log(JSON.stringify([]));
+      return;
+    }
+
+    // ONLY output the data - no other logs
+    // This ensures review.json contains pure JSON
+    if (typeof responseData === 'string') {
+      // If backend returns a string, try to parse it
+      try {
+        const parsed = JSON.parse(responseData);
+        console.log(JSON.stringify(parsed));
+      } catch {
+        // If parsing fails, wrap it as an error
+        console.log(JSON.stringify({ error: responseData }));
+      }
+    } else {
+      // Direct object/array output
+      console.log(JSON.stringify(responseData));
+    }
 
   } catch (error) {
     debugLog("❌ Review failed:", error.response?.data || error.message);

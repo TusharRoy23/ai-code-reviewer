@@ -257,63 +257,92 @@ runs:
       id: review
       shell: bash
       env:
-        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
-        MODEL: ${{ inputs.model }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         GITHUB_SHA: ${{ github.sha }}
         GITHUB_REF: ${{ github.ref }}
-        MIN_SEVERITY: ${{ inputs.min-severity }}
-        LANGUAGES: ${{ env.LANGUAGES }}
-        FRAMEWORKS: ${{ env.FRAMEWORKS }}
-        LIBRARIES: ${{ env.LIBRARIES }}
-        PROJECT_TYPE: ${{ env.PROJECT_TYPE }}
       run: |
         if [ ! -s pr.filtered.diff ]; then
-          echo "No meaningful code changes found. Skipping AI review."
+          echo "No meaningful code changes found"
           echo "has_changes=false" >> $GITHUB_OUTPUT
           exit 0
         fi
 
-        echo "   Running AI code review..."
-        echo "   Model: $MODEL"
-        echo "   Languages: $LANGUAGES"
-        echo "   Frameworks: $FRAMEWORKS"
-        echo "   Libraries: $LIBRARIES"
-        echo "   Project Type: $PROJECT_TYPE"
-        echo "   GITHUB_SHA: $GITHUB_SHA"
-        echo "   GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
-        echo "   GITHUB_REF: $GITHUB_REF"
-        echo "   "
+        echo "🚀 Running AI Code Review..."
 
-        # Run review with tee to see output
-        if node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.json; then
-          echo ""
-          echo "AI review completed successfully"
-          cat review.json
-          
-          # Check if review.json is valid JSON
-          if jq empty review.json 2>/dev/null; then
-            echo "Review completed successfully"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-            
-            # Show review for debugging in logs
-            echo "Review output:"
-            cat review.json
-          else
-            echo "Invalid JSON in review output"
-            cat review.json
-            exit 1
-          fi
-          
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-        else
-          echo "AI review failed"
+        # Run review and save output
+        node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.json 2>&1
+
+        echo ""
+        echo "📊 DEBUG: Checking review.json..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        # Check file exists
+        if [ ! -f review.json ]; then
+          echo "❌ review.json does not exist!"
           exit 1
         fi
 
-    # ------------------------------------------------------
-    # 4. POST REVIEW COMMENTS
-    # ------------------------------------------------------
+        # Check file size
+        FILE_SIZE=$(wc -c < review.json)
+        echo "📄 File size: $FILE_SIZE bytes"
+
+        # Check if empty
+        if [ "$FILE_SIZE" -eq 0 ]; then
+          echo "❌ review.json is empty!"
+          exit 1
+        fi
+
+        # Show file content (first 500 chars)
+        echo "📝 File content (first 500 chars):"
+        head -c 500 review.json
+        echo ""
+        echo ""
+
+        # Try to validate JSON with jq
+        echo "🔍 Validating JSON structure..."
+        if jq empty review.json 2>/dev/null; then
+          echo "✅ JSON is valid!"
+          
+          # Show structure
+          echo ""
+          echo "📋 JSON Structure:"
+          jq 'type' review.json
+          
+          # If it's an array, show length
+          if jq -e 'type == "array"' review.json > /dev/null 2>&1; then
+            LENGTH=$(jq 'length' review.json)
+            echo "   Array length: $LENGTH items"
+          fi
+          
+          # If it's an object with error, show it
+          if jq -e '.error' review.json > /dev/null 2>&1; then
+            echo "⚠️  Response contains error:"
+            jq '.error, .code' review.json
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ Review completed successfully"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          
+        else
+          echo "❌ JSON validation failed!"
+          echo ""
+          echo "📋 Full content:"
+          cat review.json
+          echo ""
+          echo ""
+          echo "🔧 Trying to diagnose..."
+          
+          # Try to show what jq error is
+          jq '.' review.json 2>&1 || true
+          
+          exit 1
+        fi
+
+    # ============================================
+    # POST REVIEW COMMENTS (only if review succeeded)
+    # ============================================
     - name: Post review comments
       if: |
         steps.check.outputs.skip != 'true' &&
@@ -323,23 +352,32 @@ runs:
         GITHUB_TOKEN: ${{ github.token }}
         REVIEW_MODE: ${{ inputs.review-mode }}
       run: |
-        echo "Posting review comments to PR..."
+        echo "📝 Posting review comments to PR..."
 
-        if [ "$REVIEW_MODE" = "incremental" ]; then
-          echo "Mode: Incremental (latest commit only)"
-        else
-          echo "Mode: Full PR review"
+        if [ ! -f review.json ]; then
+          echo "❌ review.json not found!"
+          exit 1
         fi
 
         node ${{ github.action_path }}/scripts/post-review.js review.json
 
-    # ------------------------------------------------------
-    # 5. CLEANUP
-    # ------------------------------------------------------
+    # ============================================
+    # CLEANUP & DEBUG LOGS
+    # ============================================
+    - name: Upload debug logs (on any event)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: review-debug-files
+        path: |
+          review.json
+          review-bot.debug.log
+        retention-days: 7
+
     - name: Cleanup
       if: always()
       shell: bash
       run: |
-        echo "Cleaning up temporary files..."
-        rm -f pr.diff pr.filtered.diff alldiff.tmp review.json
-        echo "Cleanup complete"
+        echo "🧹 Cleaning up temporary files..."
+        rm -f pr.diff pr.filtered.diff alldiff.tmp
+        echo "✅ Cleanup complete"
