@@ -83,7 +83,8 @@ async function main() {
     const result = await apiClient.post(`/review`, {
       code: escapedDiff
     });
-    console.log(JSON.stringify(result.data?.data || []));
+    // console.log(JSON.stringify(result.data?.data || []));
+    process.stdout.write(JSON.stringify(result.data?.data || []));
 
   } catch (error) {
     console.error("❌ Review failed:", error.response?.data || error.message);
