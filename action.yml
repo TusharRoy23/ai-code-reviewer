@@ -259,6 +259,9 @@ runs:
       env:
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         MODEL: ${{ inputs.model }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_REF: ${{ github.ref }}
         MIN_SEVERITY: ${{ inputs.min-severity }}
         LANGUAGES: ${{ env.LANGUAGES }}
         FRAMEWORKS: ${{ env.FRAMEWORKS }}
@@ -277,7 +280,10 @@ runs:
         echo "   Frameworks: $FRAMEWORKS"
         echo "   Libraries: $LIBRARIES"
         echo "   Project Type: $PROJECT_TYPE"
-        echo ""
+        echo "   GITHUB_SHA: $GITHUB_SHA"
+        echo "   GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
+        echo "   GITHUB_REF: $GITHUB_REF"
+        echo "   "
 
         # Run review with tee to see output
         if node ${{ github.action_path }}/scripts/review-bot.js pr.filtered.diff > review.md; then
