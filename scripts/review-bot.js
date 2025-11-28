@@ -4,6 +4,11 @@ import * as core from "@actions/core";
 
 const API_BASE_URL = `https://ai-code-reviewer-restless-violet-7974.fly.dev`;
 
+// Suppress GitHub Actions core debug output to avoid polluting stdout
+// Redirect console methods to stderr only during token acquisition
+const originalLog = console.log;
+const originalError = console.error;
+
 const debugLog = (message) => {
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] ${message}\n`;
@@ -17,9 +22,14 @@ const debugLog = (message) => {
 // Function to get GitHub OIDC token
 async function getGitHubOIDCToken() {
   try {
+    console.log = () => { };
+    console.error = () => { };
     // Request OIDC token from GitHub Actions
     // The audience must match what your backend expects
     const token = await core.getIDToken(API_BASE_URL);
+    // Restore console methods
+    console.log = originalLog;
+    console.error = originalError;
 
     if (!token) {
       throw new Error("Failed to obtain GitHub OIDC token");
@@ -124,11 +134,20 @@ async function main() {
 
   } catch (error) {
     debugLog("❌ Review failed:", error.response?.data || error.message);
+    // Output error as JSON so downstream scripts can parse it
+    console.log(JSON.stringify({
+      error: error.response?.data?.error || error.message,
+      code: error.response?.data?.code || "UNKNOWN_ERROR"
+    }));
     process.exit(1);
   }
 }
 
 main().catch(err => {
   debugLog("❌ Fatal error:", err.message);
+  console.log(JSON.stringify({
+    error: err.message,
+    code: "FATAL_ERROR"
+  }));
   process.exit(1);
 });
