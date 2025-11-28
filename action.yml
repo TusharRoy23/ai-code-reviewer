@@ -295,7 +295,7 @@ runs:
             SIZE=$(wc -c < review.md)
             LINES=$(wc -l < review.md)
             echo "Generated review: $SIZE bytes, $LINES lines"
-            
+            cat review.md
             # Validate JSON
             if cat review.md | jq empty 2>/dev/null; then
               CHUNKS=$(cat review.md | jq 'length')
