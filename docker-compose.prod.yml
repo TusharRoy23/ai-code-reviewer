@@ -1,0 +1,18 @@
+services:
+  api:
+    container_name: code-reviewer-api
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Docker
+    image: code-reviewer-api:prod
+    env_file:
+      - ./.envs/.prod/.env
+      - ./.envs/.utils/.env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - code_reviewer_api
+
+networks:
+  code_reviewer_api:

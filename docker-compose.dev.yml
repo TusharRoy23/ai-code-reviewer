@@ -1,0 +1,24 @@
+services:
+  dev:
+    container_name: code-reviewer-dev
+    image: code-reviewer-dev-api
+    env_file:
+      - ./.envs/.local/.env
+      - ./.envs/.utils/.env
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Docker-dev
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - code_reviewer_dev_network
+
+volumes:
+  node_modules:
+
+networks:
+  code_reviewer_dev_network:

@@ -201,8 +201,9 @@ const getVerifyToken = (res: Response, token: string, signingKey: string): GitHu
 export class VerifyGitHubOIDCMiddleware extends BaseMiddleware {
     async handler(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            if (process.env.nodeEnv === 'development') {
+            if (process.env.NODE_ENV === 'development') {
                 next();
+                return;
             }
             // Extract Authorization header
             const authHeader = getAuthorizationHeader(req, res);
