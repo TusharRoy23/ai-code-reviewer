@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import axios from "axios";
 // import { codeReviewGraph } from "../dist/core/langgraph/graph.js";
 
-const API_BASE_URL = `http://localhost:8000`;
+const API_BASE_URL = `http://ai-code-reviewer-solitary-star-637.fly.dev`;
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
