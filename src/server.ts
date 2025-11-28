@@ -36,7 +36,7 @@ server.setConfig((app) => {
     app.use(express.urlencoded({
         extended: true,
         parameterLimit: 10,
-        limit: '100kb'
+        limit: '150kb'
     }));
     app.use(cors(corsOptions));
     app.use(rateLimiter);

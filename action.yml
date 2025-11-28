@@ -17,7 +17,7 @@ inputs:
 
   max-diff-kb:
     description: "Max diff size in KB"
-    default: "50"
+    default: "150"
 
   min-severity:
     description: "Minimum severity to report (low, medium, high, critical)"

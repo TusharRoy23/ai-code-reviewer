@@ -21,4 +21,3 @@ jobs:
               with:
                   openai-api-key: ${{ secrets.OPENAI_API_KEY }}
                   review-mode: "full" # "full" or "incremental"
-                  max-diff-kb: 100
