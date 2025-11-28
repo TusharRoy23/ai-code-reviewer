@@ -31,8 +31,9 @@ async function main() {
         // Parse reviews
         try {
             // Make sure the reviewContent is JSON safe
-            const sanitized = reviewContent.replace(/```(json|diff)?/g, '').trim()
-            reviews = JSON.parse(sanitized);
+            // const sanitized = reviewContent.replace(/```(json|diff)?/g, '').trim()
+            reviews = JSON.parse(reviewContent);
+            console.log('reviews: ', reviews);
 
             // Validate structure
             if (!Array.isArray(reviews)) {
