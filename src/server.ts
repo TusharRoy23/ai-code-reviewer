@@ -17,18 +17,22 @@ const rateLimiter = rateLimit({
 
 const corsOptions: cors.CorsOptions = {
     origin: (origin, callback) => {
-        if (!origin) return callback(null, true); // Allow requests with no origin (like mobile apps or curl requests)
-
-        const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || [];
-        if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+        if (!origin) {
+            // Allow requests with no origin (GitHub Actions, CLI tools)
             return callback(null, true);
         }
 
-        return callback(new Error('Not allowed by CORS'));
+        const allowedOrigins = process.env.CORS_ORIGINS?.split(",") || [];
+
+        if (allowedOrigins.includes(origin) || process.env.NODE_ENV === "development") {
+            return callback(null, true);
+        }
+
+        return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    methods: ['POST'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    methods: ["POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 };
 
 server.setConfig((app) => {

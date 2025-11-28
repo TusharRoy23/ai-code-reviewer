@@ -16,6 +16,11 @@ export class ReviewerController {
     async performCodeReview(
         @requestBody() payload: ReviewPayloadType, req: Request, res: Response
     ) {
+        const githubContext = req.github;
+
+        console.log(`🔍 Starting review for ${githubContext?.repository}`);
+        console.log(`   SHA: ${githubContext?.sha}`);
+        console.log(`   Actor: ${githubContext?.actor}`);
         const result = await this.reviewerService.requestForReview(payload);
         return res.status(201).json({ data: result });
     }
