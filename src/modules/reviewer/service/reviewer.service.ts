@@ -3,6 +3,7 @@ import type { IReviewerService } from "../interface/IReviewer.service.ts";
 import { TYPES } from "../../../config/types.ts";
 import type { IReviewerRepository } from "../interface/IReviewer.repository.ts";
 import type { ReviewPayloadType } from "../dto/review-payload.dto.ts";
+import type { Review } from "../../../core/langgraph/utils/types.ts";
 
 @injectable()
 export class ReviewerService implements IReviewerService {
@@ -11,7 +12,7 @@ export class ReviewerService implements IReviewerService {
         @inject(TYPES.IReviewerRepository) private readonly reviewerRepository: IReviewerRepository
     ) { }
 
-    requestForReview(payload: ReviewPayloadType): Promise<any> {
+    requestForReview(payload: ReviewPayloadType): Promise<Review[]> {
         return this.reviewerRepository.requestForReview(payload);
     }
 }

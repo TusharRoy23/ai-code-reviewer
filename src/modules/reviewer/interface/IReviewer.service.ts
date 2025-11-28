@@ -1,4 +1,4 @@
-import type { Review } from "../../../core/langgraph/states/state.ts";
+import type { Review } from "../../../core/langgraph/utils/types.ts";
 import type { ReviewPayloadType } from "../dto/review-payload.dto.ts";
 
 export interface IReviewerService {
