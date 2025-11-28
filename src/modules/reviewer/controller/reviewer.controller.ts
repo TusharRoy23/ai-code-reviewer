@@ -6,13 +6,13 @@ import { controller, httpGet, httpPost, requestBody } from "inversify-express-ut
 import type { ReviewPayloadType } from "../dto/review-payload.dto.ts";
 import { VerifyGitHubOIDCMiddleware } from "../../../middleware/github-oidc.middleware.ts";
 
-@controller("/review")
+@controller("/review", VerifyGitHubOIDCMiddleware)
 export class ReviewerController {
     constructor(
         @inject(TYPES.IReviewerService) private readonly reviewerService: IReviewerService
     ) { }
 
-    @httpPost("/", VerifyGitHubOIDCMiddleware)
+    @httpPost("/")
     async performCodeReview(
         @requestBody() payload: ReviewPayloadType, req: Request, res: Response
     ) {
@@ -23,10 +23,5 @@ export class ReviewerController {
         // console.log(`   Actor: ${githubContext?.actor}`);
         const result = await this.reviewerService.requestForReview(payload);
         return res.status(201).json({ data: result });
-    }
-
-    @httpGet("/health")
-    async healthCheckup(req: Request, res: Response) {
-        return res.status(200).json({ data: 'I am Good' })
     }
 }

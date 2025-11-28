@@ -3,6 +3,8 @@ name: AI Code Review
 on:
     pull_request:
         types: [opened, synchronize, reopened]
+    issue_comment:
+        types: [created]
 
 jobs:
     review:
@@ -20,4 +22,4 @@ jobs:
             - name: AI Code Review
               uses: ./
               with:
-                  review-mode: "full" # "full" or "incremental"
+                  review-mode: "incremental" # "full" or "incremental"
