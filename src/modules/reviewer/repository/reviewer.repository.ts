@@ -4,7 +4,7 @@ import type { IReviewerRepository } from "../interface/IReviewer.repository.ts";
 import type { ReviewPayloadType } from "../dto/review-payload.dto.ts";
 import { TYPES } from "../../../config/types.ts";
 import type { IGraphBuilder } from "../../../core/langgraph/interface/IGraphBuilder.ts";
-import type { Review } from "../../../core/langgraph/states/state.ts";
+import type { Issue, Review } from "../../../core/langgraph/utils/types.ts";
 
 @injectable()
 export class ReviewerRepository implements IReviewerRepository {
@@ -20,7 +20,7 @@ export class ReviewerRepository implements IReviewerRepository {
             const result = await this.graph.invoke({
                 rawInput: payload.code
             }, { configurable: { thread_id: uuidv4() } });
-            return result.reviews;
+            return result.reviews?.filter((review: Review) => review?.issues?.length > 0);
         } catch (error) {
             throw error;
         }

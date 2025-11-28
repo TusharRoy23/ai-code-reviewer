@@ -1,7 +1,8 @@
 import { agentConcurrency } from "../../../config/concurrency.ts";
 import { shouldSkipFile, isSimpleChange, getFilePriority, selectAgentsForFile, reviewAgents, deduplicateIssues } from "../../../utils/helper.ts";
 import type { IReviewerNodes } from "../interface/IReviewer.nodes.ts";
-import type { Chunk, ReviewState } from "../states/state.ts";
+import type { ReviewState } from "../states/state.ts";
+import type { Chunk } from "../utils/types.ts";
 
 export class ReviewerNodes implements IReviewerNodes {
     splitIntoChunks(state: typeof ReviewState.State): Partial<typeof ReviewState.State> {
