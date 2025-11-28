@@ -11,7 +11,7 @@ async function getGitHubOIDCToken() {
 
     // Request OIDC token from GitHub Actions
     // The audience must match what your backend expects
-    const token = await core.getIDToken("https://api.github.com");
+    const token = await core.getIDToken(API_BASE_URL);
 
     if (!token) {
       throw new Error("Failed to obtain GitHub OIDC token");
