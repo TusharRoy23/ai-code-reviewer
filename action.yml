@@ -45,8 +45,11 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: 20
-        cache: "pnpm"
-        cache-dependency-path: "package.json"
+
+    - name: Enable corepack
+      if: steps.check.outputs.skip != 'true'
+      shell: bash
+      run: corepack enable
 
     - name: Install action dependencies
       if: steps.check.outputs.skip != 'true'
