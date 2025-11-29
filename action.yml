@@ -45,21 +45,13 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: 20
+        cache: "pnpm"
+        cache-dependency-path: "package.json"
 
-    - name: Install pnpm
+    - name: Install action dependencies
       if: steps.check.outputs.skip != 'true'
       shell: bash
-      run: npm install -g pnpm
-
-    - name: Install dependencies
-      if: steps.check.outputs.skip != 'true'
-      shell: bash
-      run: pnpm install
-
-    - name: Build TypeScript
-      if: steps.check.outputs.skip != 'true' && hashFiles('tsconfig.json') != ''
-      shell: bash
-      run: pnpm run build
+      run: pnpm install --frozen-lockfile
 
     # ------------------------------------------------------
     # 2. DOWNLOAD DIFF (Full or Incremental)
