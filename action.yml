@@ -54,7 +54,7 @@ runs:
     - name: Install action dependencies
       if: steps.check.outputs.skip != 'true'
       shell: bash
-      run: pnpm install --frozen-lockfile
+      run: pnpm install --no-frozen-lockfile
 
     # ------------------------------------------------------
     # 2. DOWNLOAD DIFF (Full or Incremental)
