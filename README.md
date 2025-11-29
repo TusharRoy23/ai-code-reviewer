@@ -51,7 +51,7 @@ jobs:
         with:
           fetch-depth: 0   # Full history for diff comparison
 
-      - uses: TusharRoy23/ai-code-reviewer@v1
+      - uses: TusharRoy23/ai-code-reviewer@v0.0.1
         with:
           trigger-phrase: "@ai-code-reviewer review"
           review-mode: "incremental"
@@ -95,7 +95,7 @@ Comment on PR with trigger phrase to review on demand:
 - Slightly slower
 
 ```yaml
-- uses: TusharRoy23/ai-code-reviewer@v1
+- uses: TusharRoy23/ai-code-reviewer@v0.0.1
   with:
     review-mode: "full"  # Or "incremental"
 ```
