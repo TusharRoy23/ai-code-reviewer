@@ -63,7 +63,7 @@ runs:
     - name: Set hardcoded limits
       shell: bash
       run: |
-        echo "MAX_DIFF_KB=100" >> $GITHUB_ENV
+        echo "MAX_DIFF_KB=150" >> $GITHUB_ENV
     - name: Download PR diff
       if: steps.check.outputs.skip != 'true'
       id: diff
