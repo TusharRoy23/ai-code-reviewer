@@ -1,4 +1,4 @@
-# AI Code Reviewer
+# Agentic AI Code Reviewer
 
 🤖 **AI-powered Multi-agent code reviewer using LangGraph Agents**
 
@@ -197,7 +197,7 @@ User opens PR with new feature
   ↓
 GitHub Actions triggers automatically
   ↓
-AI Code Reviewer posts review comments
+Agentic AI Code Reviewer posts review comments
   ↓
 User can see suggestions on code diff
   ↓
