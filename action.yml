@@ -54,7 +54,20 @@ runs:
     - name: Install action dependencies
       if: steps.check.outputs.skip != 'true'
       shell: bash
-      run: pnpm install --no-frozen-lockfile
+      working-directory: ${{ github.action_path }}
+      run: |
+        echo "Installing action dependencies from: ${{ github.action_path }}"
+
+        # Check if package.json exists
+        if [ ! -f package.json ]; then
+          echo "No package.json found in action directory"
+          exit 1
+        fi
+
+        # Install dependencies
+        pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
+
+        echo "Action dependencies installed successfully"
 
     # ------------------------------------------------------
     # 2. DOWNLOAD DIFF (Full or Incremental)
@@ -63,6 +76,7 @@ runs:
       shell: bash
       run: |
         echo "MAX_DIFF_KB=150" >> $GITHUB_ENV
+
     - name: Download PR diff
       if: steps.check.outputs.skip != 'true'
       id: diff
@@ -191,7 +205,7 @@ runs:
       run: |
         echo "🔍 Detecting project information..."
 
-        # Run the detector script
+        # Run the detector script from action directory
         INFO=$(node ${{ github.action_path }}/scripts/project-info-detector.js)
 
         # Check if INFO is valid JSON
@@ -331,6 +345,7 @@ runs:
           
           exit 1
         fi
+
     # ============================================
     # POST REVIEW COMMENTS (only if review succeeded)
     # ============================================
@@ -362,6 +377,7 @@ runs:
         name: review-debug-files
         path: |
           review.json
+          review.json.raw
           review-bot.debug.log
         retention-days: 7
 
