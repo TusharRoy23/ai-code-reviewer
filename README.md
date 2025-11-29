@@ -41,17 +41,17 @@ jobs:
   review:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write      # Required for OIDC
-      contents: read
-      pull-requests: read
-      issues: write        # For posting comments
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
     
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Full history for diff comparison
+          fetch-depth: 0 
 
-      - uses: TusharRoy23/ai-code-reviewer@v0.0.1
+      - uses: TusharRoy23/ai-code-reviewer@v0.0.5
         with:
           trigger-phrase: "@ai-code-reviewer review"
           review-mode: "incremental"
@@ -95,9 +95,9 @@ Comment on PR with trigger phrase to review on demand:
 - Slightly slower
 
 ```yaml
-- uses: TusharRoy23/ai-code-reviewer@v0.0.1
+- uses: TusharRoy23/ai-code-reviewer@v0.0.5
   with:
-    review-mode: "full"  # Or "incremental"
+    review-mode: "incremental"  # Or "full"
 ```
 
 ---
@@ -123,10 +123,10 @@ Comment on PR with trigger phrase to review on demand:
 
 ```yaml
 permissions:
-  id-token: write        # For OIDC token generation
-  contents: read         # To read code
-  pull-requests: read    # To read PR data
-  issues: write          # To post comments
+  id-token: write         # OIDC Auth - Securely call your backend without API keys
+  contents: write         # Repo contents (files) - Generate diffs or potentially write outputs
+  pull-requests: write    # To read PR data - Post review comments or approvals
+  issues: write           # To post comments - Respond to trigger comments in PRs or issues
 ```
 
 ---
@@ -236,7 +236,7 @@ To protect against abuse, the action includes:
 1. ✅ Check `permissions: { id-token: write }` is set
 2. ✅ Verify `fetch-depth: 0` in checkout step
 3. ✅ Check workflow trigger events (PR or issue_comment)
-4. ✅ Ensure action is using latest version `@v1`
+4. ✅ Ensure action is using latest version `@v5`
 
 ### No comments appearing?
 
