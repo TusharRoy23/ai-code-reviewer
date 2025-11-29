@@ -9,7 +9,7 @@ import github from "@actions/github";
 async function main() {
     try {
         // Get inputs
-        const reviewFilePath = process.argv[2] || 'review.md';
+        const reviewFilePath = process.argv[2] || 'review.json';
         const token = process.env.GITHUB_TOKEN;
 
         if (!token) {
@@ -31,8 +31,8 @@ async function main() {
         // Parse reviews
         try {
             // Make sure the reviewContent is JSON safe
-            const sanitized = reviewContent.replace(/```(json|diff)?/g, '').trim()
-            reviews = JSON.parse(sanitized);
+            // const sanitized = reviewContent.replace(/```(json|diff)?/g, '').trim()
+            reviews = JSON.parse(reviewContent);
 
             // Validate structure
             if (!Array.isArray(reviews)) {

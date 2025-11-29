@@ -1,0 +1,42 @@
+# Docker-dev
+FROM node:20-alpine
+
+# Set environment variables
+ENV NODE_ENV=development
+# ENV PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK=true
+
+# Set working directory
+WORKDIR /app
+
+# 1. Install system packages
+RUN apk update && \
+    apk add --no-cache openntpd tzdata bash && \
+    cp /usr/share/zoneinfo/Europe/Stockholm /etc/localtime && \
+    echo "EU" > /etc/timezone
+
+# 2. Install pnpm (preferred over npm)
+RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
+
+# 3. Copy package files (for caching)
+COPY pnpm-lock.yaml package.json ./
+
+# 4. Install dependencies (frozen lockfile for consistency)
+RUN pnpm install --frozen-lockfile
+
+# 5. Install global tools used in dev
+# RUN pnpm add -g prisma
+# RUN pnpm add -g tsx nodemon typescript
+
+# 6. Copy the whole project
+COPY . .
+
+# 7. Generate Prisma client
+# RUN pnpm prisma generate
+
+# 8. Expose ports
+EXPOSE 8000
+
+# 9. Command for development with hot reload
+# You can customize this to match your "dev" script in package.json
+# CMD ["sh", "-c", "pnpm prisma generate && pnpm run dev"]
+CMD ["sh", "-c", "pnpm run dev"]
