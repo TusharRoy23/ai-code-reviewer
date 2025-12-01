@@ -1,35 +1,32 @@
+// graph/states/state.ts
 import { Annotation } from "@langchain/langgraph";
-import type { Chunk, Review } from "../utils/types.ts";
+import type { FileContext, AgentPlan, Review } from "../utils/types.ts";
 
 export const ReviewState = Annotation.Root({
-    // ───────────────────────────────
-    // INPUT (what the user gives us)
-    // ───────────────────────────────
-    rawInput: Annotation<string>({
-        reducer: (x: any, y: any) => y ?? x,
-        default: () => "",
-    }),
-    // The exact text the user pasted: git diff, multiple files, or single snippet
+    // Input
+    rawInput: Annotation<string>,
 
-    // ───────────────────────────────
-    // INTERMEDIATE
-    // ───────────────────────────────
-    chunks: Annotation<Chunk[]>({
-        reducer: (x: any, y: any) => y ?? x,
-        default: () => [],
+    // Phase 1: Split & Enrich
+    chunks: Annotation<FileContext[]>({
+        reducer: (state, update) => update,
+        default: () => []
     }),
 
+    // Phase 2: Coordinator plans (NEW)
+    agentPlans: Annotation<AgentPlan[]>({
+        reducer: (state, update) => [...state, ...update],
+        default: () => []
+    }),
+
+    // Phase 3: Reviews
     reviews: Annotation<Review[]>({
-        reducer: (x: any, y: any) => [...(x ?? []), ...(y ?? [])], // concat with the last review,
-        default: () => [],
+        reducer: (state, update) => [...state, ...update],
+        default: () => []
     }),
-    // Structured reviews from the LLM (one per chunk)
 
-    // ───────────────────────────────
-    // FINAL OUTPUT
-    // ───────────────────────────────
+    // Phase 4: Final output
     finalReview: Annotation<string>({
-        reducer: (x: any, y: any) => y ?? x,
-        default: () => "",
+        reducer: (state, update) => update,
+        default: () => ""
     })
 });

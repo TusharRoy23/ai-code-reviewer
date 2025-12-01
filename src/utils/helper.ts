@@ -5,6 +5,7 @@ import { performanceAgent } from "../core/langgraph/agents/performanceAgent.ts";
 import { readabilityAgent } from "../core/langgraph/agents/readabilityAgent.ts";
 import { securityAgent } from "../core/langgraph/agents/securityAgent.ts";
 import { testingAgent } from "../core/langgraph/agents/testingAgent.ts";
+import { Agents } from "../core/langgraph/utils/types.ts";
 
 export const reviewAgents = [
     { name: "security", agent: securityAgent },
@@ -14,6 +15,15 @@ export const reviewAgents = [
     { name: "idiomatic", agent: idiomaticAgent },
     { name: "architecture", agent: architectureAgent },
 ];
+
+export const AGENT_MAP: Record<string, any> = {
+    [Agents.SECURITY]: securityAgent,
+    [Agents.PERFORMANCE]: performanceAgent,
+    [Agents.ARCHITECTURE]: architectureAgent,
+    [Agents.TESTING]: testingAgent,
+    [Agents.READABILITY]: readabilityAgent,
+    [Agents.IDIOMATIC]: idiomaticAgent,
+};
 
 /**
  * Check if a file should be skipped
