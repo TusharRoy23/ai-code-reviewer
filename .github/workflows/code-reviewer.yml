@@ -24,3 +24,5 @@ jobs:
               with:
                   trigger-phrase: "@ai-code-reviewer review"
                   review-mode: "incremental"
+                  llm-model: ${{ secrets.LLM_MODEL }} # "gpt-4o-mini"
+                  llm-api-key: ${{ secrets.LLM_API_KEY }}

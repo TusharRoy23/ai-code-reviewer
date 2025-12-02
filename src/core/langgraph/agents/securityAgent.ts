@@ -1,4 +1,3 @@
-// agents/security.agent.ts
 import { makeAgent } from "./makeAgent.ts";
 
 const prompt = `You are a senior security engineer reviewing code for vulnerabilities.

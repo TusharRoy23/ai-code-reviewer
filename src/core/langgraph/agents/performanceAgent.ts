@@ -1,4 +1,3 @@
-// agents/performance.agent.ts
 import { makeAgent } from "./makeAgent.ts";
 
 const prompt = `You are a performance optimization expert.
@@ -35,6 +34,6 @@ const prompt = `You are a performance optimization expert.
 Only flag issues that have measurable performance impact.`;
 
 export const performanceAgent = makeAgent({
-    name: "performance-agent",
-    systemPrompt: prompt
+   name: "performance-agent",
+   systemPrompt: prompt
 });
