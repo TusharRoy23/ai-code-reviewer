@@ -5,7 +5,8 @@ import { performanceAgent } from "../core/langgraph/agents/performanceAgent.ts";
 import { readabilityAgent } from "../core/langgraph/agents/readabilityAgent.ts";
 import { securityAgent } from "../core/langgraph/agents/securityAgent.ts";
 import { testingAgent } from "../core/langgraph/agents/testingAgent.ts";
-import { Agents, Severity } from "../core/langgraph/utils/types.ts";
+import { Agents } from "../core/langgraph/utils/types.ts";
+import { bugsAgent } from "../core/langgraph/agents/bugAgent.ts";
 
 export const reviewAgents = [
     { name: "security", agent: securityAgent },
@@ -14,6 +15,7 @@ export const reviewAgents = [
     { name: "readability", agent: readabilityAgent },
     { name: "idiomatic", agent: idiomaticAgent },
     { name: "architecture", agent: architectureAgent },
+    { name: "bugs", agent: bugsAgent }
 ];
 
 export const AGENT_MAP: Record<string, any> = {
@@ -23,6 +25,7 @@ export const AGENT_MAP: Record<string, any> = {
     [Agents.TESTING]: testingAgent,
     [Agents.READABILITY]: readabilityAgent,
     [Agents.IDIOMATIC]: idiomaticAgent,
+    [Agents.BUGS]: bugsAgent
 };
 
 /**

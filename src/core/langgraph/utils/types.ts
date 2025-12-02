@@ -20,7 +20,8 @@ export enum Agents {
     ARCHITECTURE = 'architecture',
     TESTING = 'testing',
     READABILITY = 'readability',
-    IDIOMATIC = 'idiomatic'
+    IDIOMATIC = 'idiomatic',
+    BUGS = 'bugs'
 }
 
 export interface Chunk {
