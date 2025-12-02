@@ -254,7 +254,7 @@ function generateSummaryComment(reviews, commentCount, errorCount) {
             });
     }
 
-    if (severityCounts.critical > 0 || severityCounts.high > 0) {
+    if (summary.critical > 0 || summary.high > 0) {
         reviewSummary += `\n**Action Required:** Please address critical and high severity issues before merging.`;
     } else {
         reviewSummary += `\n**Good to go!** No critical or high severity issues found.`;

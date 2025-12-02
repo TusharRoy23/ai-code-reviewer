@@ -25,32 +25,33 @@ export class ReviewerNodes implements IReviewerNodes {
 
                 fileSections.forEach((content: string, i: number) => {
                     const filenameMatch = content.match(/ b\/(.+?)(\s|$)/);
-                    const filename = filenameMatch ? filenameMatch[1] : `file_${i}`;
+                    const filename = filenameMatch ? filenameMatch[1] : null;
+                    if (filename) {
+                        // Skip unwanted files
+                        if (shouldSkipFile(filename)) {
+                            console.log(`⏭️  Skipping: ${filename}`);
+                            return;
+                        }
 
-                    // Skip unwanted files
-                    if (shouldSkipFile(filename)) {
-                        console.log(`⏭️  Skipping: ${filename}`);
-                        return;
+                        // Skip simple changes (whitespace, comments only)
+                        if (isSimpleChange(content)) {
+                            console.log(`⏭️  Skipping simple change: ${filename}`);
+                            return;
+                        }
+
+                        // Create basic chunk
+                        const basicChunk: Chunk = {
+                            id: `${i}`,
+                            filename,
+                            content,
+                        };
+
+                        // Enrich with full context
+                        const enrichedChunk = this.contextEnricher.enrichChunk(basicChunk);
+                        chunks.push(enrichedChunk);
+
+                        console.log(`✅ Enriched: ${filename} (${enrichedChunk.linesAdded}+ ${enrichedChunk.linesRemoved}-)`);
                     }
-
-                    // Skip simple changes (whitespace, comments only)
-                    if (isSimpleChange(content)) {
-                        console.log(`⏭️  Skipping simple change: ${filename}`);
-                        return;
-                    }
-
-                    // Create basic chunk
-                    const basicChunk: Chunk = {
-                        id: `${i}`,
-                        filename,
-                        content,
-                    };
-
-                    // Enrich with full context
-                    const enrichedChunk = this.contextEnricher.enrichChunk(basicChunk);
-                    chunks.push(enrichedChunk);
-
-                    console.log(`✅ Enriched: ${filename} (${enrichedChunk.linesAdded}+ ${enrichedChunk.linesRemoved}-)`);
                 });
 
                 // Sort by priority (critical files first)
