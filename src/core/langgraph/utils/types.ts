@@ -88,6 +88,7 @@ export interface Review {
 
 export type Summary = {
     totalIssues: number;
+    totalFilesReviewed: number;
     [Severity.CRITICAL]: number;
     [Severity.HIGH]: number;
     [Severity.LOW]: number;

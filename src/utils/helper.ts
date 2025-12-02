@@ -5,7 +5,7 @@ import { performanceAgent } from "../core/langgraph/agents/performanceAgent.ts";
 import { readabilityAgent } from "../core/langgraph/agents/readabilityAgent.ts";
 import { securityAgent } from "../core/langgraph/agents/securityAgent.ts";
 import { testingAgent } from "../core/langgraph/agents/testingAgent.ts";
-import { Agents } from "../core/langgraph/utils/types.ts";
+import { Agents, Severity } from "../core/langgraph/utils/types.ts";
 
 export const reviewAgents = [
     { name: "security", agent: securityAgent },
@@ -199,79 +199,4 @@ export const selectAgentsForFile = (filename: string, content: string): typeof r
 
     // Default: All agents
     return allAgents;
-}
-
-// Helper: Normalize issue types to catch variations
-const normalizeIssueType = (type: string): string => {
-    const normalized = type.toLowerCase().trim();
-
-    // Map similar types together
-    if (normalized.includes('sql') || normalized.includes('injection')) {
-        return 'sql_injection';
-    }
-    if (normalized.includes('n+1') || normalized.includes('n + 1')) {
-        return 'n_plus_one';
-    }
-    if (normalized.includes('memory') && normalized.includes('leak')) {
-        return 'memory_leak';
-    }
-
-    return normalized;
-}
-
-function getSeverityScore(severity: string): number {
-    const scores: Record<string, number> = {
-        'critical': 4,
-        'high': 3,
-        'medium': 2,
-        'low': 1
-    };
-    return scores[severity?.toLowerCase()] || 0;
-}
-
-// ──────────────────────────────
-// DEDUPLICATION (Reduce Noise)
-// ──────────────────────────────
-export const deduplicateIssues = (reviews: any[]): any[] => {
-    const seen = new Map<string, any>(); // Use Map to store best issue
-
-    for (const review of reviews) {
-        for (const issue of review.issues) {
-            // Robust signature
-            const signature = `${issue.lineStart}-${issue.lineEnd}:${normalizeIssueType(issue.type)}`;
-
-            const existing = seen.get(signature);
-
-            if (!existing) {
-                // If issue not exists
-                seen.set(signature, { ...issue, agentName: review.type });
-            } else {
-                // Duplicate found - keep the one with higher severity
-                if (getSeverityScore(issue.severity) > getSeverityScore(existing.severity)) {
-                    seen.set(signature, { ...issue, agentName: review.type });
-                }
-            }
-        }
-    }
-
-    // Group by agent type for the final output
-    const deduplicated: any[] = [];
-    const byAgent = new Map<string, any[]>();
-
-    for (const issue of seen.values()) {
-        const agentName = issue.agentName;
-        if (!byAgent.has(agentName)) {
-            byAgent.set(agentName, []);
-        }
-        byAgent.get(agentName)!.push(issue);
-    }
-
-    for (const [agentName, issues] of byAgent) {
-        deduplicated.push({
-            type: agentName,
-            issues
-        });
-    }
-
-    return deduplicated;
 }

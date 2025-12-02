@@ -1,5 +1,5 @@
 import { agentConcurrency } from "../../../config/concurrency.ts";
-import { shouldSkipFile, isSimpleChange, getFilePriority, deduplicateIssues, AGENT_MAP } from "../../../utils/helper.ts";
+import { shouldSkipFile, isSimpleChange, getFilePriority, AGENT_MAP } from "../../../utils/helper.ts";
 import type { IReviewerNodes } from "../interface/IReviewer.nodes.ts";
 import type { ReviewState } from "../states/state.ts";
 import { Priority, Severity, type AgentPlan, type Chunk, type FileContext } from "../utils/types.ts";
@@ -119,9 +119,9 @@ export class ReviewerNodes implements IReviewerNodes {
                     reasoning: parsed.reasoning || 'No reasoning provided'
                 };
 
-                console.log(`   Agents selected: ${plan.agents.join(', ')}`);
-                console.log(`   Priority: ${plan.priority}`);
-                console.log(`   Reasoning: ${plan.reasoning}`);
+                console.log(`   Agents selected: ${plan?.agents?.join(', ')}`);
+                console.log(`   Priority: ${plan?.priority}`);
+                console.log(`   Reasoning: ${plan?.reasoning}`);
             } else {
                 // Fallback: run all agents
                 plan = {
@@ -257,12 +257,7 @@ export class ReviewerNodes implements IReviewerNodes {
             // Filter out empty reviews
             const filteredReviews = allReviews.filter(r => r.issues?.length > 0);
 
-            // Deduplicate similar issues
-            const deduplicatedReviews = deduplicateIssues(filteredReviews);
-
-            console.log(`   Total issues after deduplication: ${deduplicatedReviews.flatMap(r => r.issues).length}`);
-
-            return { reviews: deduplicatedReviews };
+            return { reviews: filteredReviews };
         } catch (error) {
             console.error(`❌ Error reviewing ${chunkData.filename}:`, error);
             return { reviews: [] };
@@ -283,6 +278,7 @@ export class ReviewerNodes implements IReviewerNodes {
                     finalReview: {
                         summary: {
                             totalIssues: 0,
+                            totalFilesReviewed: 0,
                             [Severity.CRITICAL]: 0,
                             [Severity.MEDIUM]: 0,
                             [Severity.HIGH]: 0,
@@ -293,20 +289,29 @@ export class ReviewerNodes implements IReviewerNodes {
                     }
                 };
             }
+            const totalFileReviewed: Record<string, number> = {};
+
+            const findings = state.reviews?.map(review => {
+                if (!totalFileReviewed[review.filename]) {
+                    totalFileReviewed[review.filename] = 1;
+                }
+                return {
+                    file: review.filename,
+                    agent: review.agentType,
+                    issues: review.issues
+                };
+            });
 
             const finalReview = {
                 summary: {
                     totalIssues: allIssues.length,
+                    totalFilesReviewed: Object.keys(totalFileReviewed).length,
                     [Severity.CRITICAL]: allIssues.filter(i => i.severity === Severity.CRITICAL).length,
                     [Severity.HIGH]: allIssues.filter(i => i.severity === Severity.HIGH).length,
                     [Severity.MEDIUM]: allIssues.filter(i => i.severity === Severity.MEDIUM).length,
                     [Severity.LOW]: allIssues.filter(i => i.severity === Severity.LOW).length,
                 },
-                findings: state.reviews.map(review => ({
-                    file: review.filename,
-                    agent: review.agentType,
-                    issues: review.issues
-                }))
+                findings
             };
             return {
                 finalReview
@@ -317,6 +322,7 @@ export class ReviewerNodes implements IReviewerNodes {
                 finalReview: {
                     summary: {
                         totalIssues: 0,
+                        totalFilesReviewed: 0,
                         [Severity.CRITICAL]: 0,
                         [Severity.MEDIUM]: 0,
                         [Severity.HIGH]: 0,

@@ -35,11 +35,11 @@ async function main() {
             reviews = JSON.parse(reviewContent);
 
             // Validate structure
-            if (!Array.isArray(reviews)) {
+            if (!Array.isArray(reviews['findings'])) {
                 throw new Error('Reviews must be an array');
             }
 
-            console.log(`Parsed ${reviews.length} review chunks`);
+            console.log(`Parsed ${reviews['summary']?.totalIssues} review chunks`);
         } catch (e) {
             console.error('Failed to parse review file as JSON:', e.message);
             console.error('Content preview:', reviewContent.substring(0, 500));
@@ -56,7 +56,6 @@ async function main() {
         }
 
         console.log(`\nPosting reviews for PR #${pr_number}`);
-        console.log(`Total files to review: ${reviews.length}`);
 
         // Get the latest commit SHA
         const { data: pr } = await octokit.rest.pulls.get({
@@ -74,8 +73,8 @@ async function main() {
         const failedComments = [];
 
         // Post comments for each file
-        for (const chunk of reviews) {
-            const filename = chunk.filename;
+        for (const chunk of reviews['findings']) {
+            const filename = chunk.file;
             console.log(`Processing file: ${filename}`);
 
             if (!chunk.issues || chunk.issues.length === 0) {
@@ -83,67 +82,58 @@ async function main() {
                 continue;
             }
 
-            for (const category of chunk.issues) {
-                const categoryType = category.type || 'general';
-
-                if (!category.issues || category.issues.length === 0) {
+            for (const issue of chunk.issues) {
+                const categoryType = issue.type || 'general';
+                // Skip if no line number
+                if (!issue.lineStart) {
+                    console.log(`Skipping issue (no lineStart): ${issue.description?.substring(0, 50)}...`);
                     continue;
                 }
 
-                console.log(`Category: ${categoryType} (${category.issues.length} issue(s))`);
+                // Format comment body
+                const commentBody = formatComment(categoryType, issue);
 
-                for (const issue of category.issues) {
-                    // Skip if no line number
-                    if (!issue.lineStart) {
-                        console.log(`Skipping issue (no lineStart): ${issue.description?.substring(0, 50)}...`);
-                        continue;
-                    }
+                try {
+                    // Attempt to post line-specific comment
+                    await octokit.rest.pulls.createReviewComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: pr_number,
+                        commit_id: commit_id,
+                        path: filename,
+                        line: issue.lineStart,
+                        side: "RIGHT",
+                        body: commentBody
+                    });
 
-                    // Format comment body
-                    const commentBody = formatComment(categoryType, issue);
+                    commentCount++;
+                    console.log(`Posted comment at line ${issue.lineStart}`);
 
-                    try {
-                        // Attempt to post line-specific comment
-                        await octokit.rest.pulls.createReviewComment({
-                            owner: context.repo.owner,
-                            repo: context.repo.repo,
-                            pull_number: pr_number,
-                            commit_id: commit_id,
-                            path: filename,
-                            line: issue.lineStart,
-                            side: "RIGHT",
-                            body: commentBody
-                        });
+                } catch (error) {
+                    errorCount++;
+                    console.error(`Failed to post comment at line ${issue.lineStart}: ${error.message}`);
 
-                        commentCount++;
-                        console.log(`Posted comment at line ${issue.lineStart}`);
+                    // Store failed comment for fallback
+                    failedComments.push({
+                        filename,
+                        line: issue.lineStart,
+                        body: commentBody,
+                        error: error.message
+                    });
 
-                    } catch (error) {
-                        errorCount++;
-                        console.error(`Failed to post comment at line ${issue.lineStart}: ${error.message}`);
-
-                        // Store failed comment for fallback
-                        failedComments.push({
-                            filename,
-                            line: issue.lineStart,
-                            body: commentBody,
-                            error: error.message
-                        });
-
-                        // If it's a validation error (line not in diff), try posting as general comment
-                        if (error.status === 422) {
-                            try {
-                                await octokit.rest.issues.createComment({
-                                    owner: context.repo.owner,
-                                    repo: context.repo.repo,
-                                    issue_number: pr_number,
-                                    body: `**${filename}** (around line ${issue.lineStart})\n\n${commentBody}`
-                                });
-                                console.log(`Posted as general comment instead`);
-                                commentCount++;
-                            } catch (fallbackError) {
-                                console.error(`Fallback also failed: ${fallbackError.message}`);
-                            }
+                    // If it's a validation error (line not in diff), try posting as general comment
+                    if (error.status === 422) {
+                        try {
+                            await octokit.rest.issues.createComment({
+                                owner: context.repo.owner,
+                                repo: context.repo.repo,
+                                issue_number: pr_number,
+                                body: `**${filename}** (around line ${issue.lineStart})\n\n${commentBody}`
+                            });
+                            console.log(`Posted as general comment instead`);
+                            commentCount++;
+                        } catch (fallbackError) {
+                            console.error(`Fallback also failed: ${fallbackError.message}`);
                         }
                     }
                 }
@@ -156,7 +146,7 @@ async function main() {
         console.log(`${'='.repeat(50)}`);
         console.log(`Comments posted: ${commentCount}`);
         console.log(`Errors: ${errorCount}`);
-        console.log(`Files reviewed: ${reviews.length}`);
+        console.log(`Files reviewed: ${reviews['summary']?.totalIssues}`);
 
         // Post summary comment to PR
         if (commentCount > 0) {
@@ -231,53 +221,46 @@ function getSeverityBadge(severity) {
  */
 function generateSummaryComment(reviews, commentCount, errorCount) {
     // Count issues by severity
-    const severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+    const summary = reviews['summary'];
     const categoryCounts = {};
 
-    for (const review of reviews) {
-        for (const category of review.issues || []) {
-            const categoryType = category.type || 'general';
-            categoryCounts[categoryType] = (categoryCounts[categoryType] || 0) + (category.issues?.length || 0);
-
-            for (const issue of category.issues || []) {
-                const severity = issue.severity?.toLowerCase() || 'medium';
-                severityCounts[severity] = (severityCounts[severity] || 0) + 1;
-            }
-        }
+    for (const issue of reviews['findings']) {
+        const categoryType = issue.category || 'general';
+        categoryCounts[categoryType] = categoryCounts[categoryType] ? categoryCounts[categoryType] + 1 : 1;
     }
 
     // Build summary
-    let summary = `##AI Code Review Summary\n\n`;
-    summary += `**Overview:**\n`;
-    summary += `- Files reviewed: ${reviews.length}\n`;
-    summary += `- Total issues found: ${commentCount}\n`;
+    let reviewSummary = `##AI Code Review Summary\n\n`;
+    reviewSummary += `**Overview:**\n`;
+    reviewSummary += `- Files reviewed: ${summary['totalFilesReviewed']}\n`;
+    reviewSummary += `- Total issues found: ${commentCount}\n`;
 
     if (errorCount > 0) {
-        summary += `- Failed comments: ${errorCount}\n`;
+        reviewSummary += `- Failed comments: ${errorCount}\n`;
     }
 
-    summary += `\n### Severity Breakdown\n`;
-    if (severityCounts.critical > 0) summary += `- 🔴 **Critical:** ${severityCounts.critical}\n`;
-    if (severityCounts.high > 0) summary += `- 🟠 **High:** ${severityCounts.high}\n`;
-    if (severityCounts.medium > 0) summary += `- 🟡 **Medium:** ${severityCounts.medium}\n`;
-    if (severityCounts.low > 0) summary += `- 🟢 **Low:** ${severityCounts.low}\n`;
+    reviewSummary += `\n### Severity Breakdown\n`;
+    if (summary.critical > 0) reviewSummary += `- 🔴 **Critical:** ${summary.critical}\n`;
+    if (summary.high > 0) reviewSummary += `- 🟠 **High:** ${summary.high}\n`;
+    if (summary.medium > 0) reviewSummary += `- 🟡 **Medium:** ${summary.medium}\n`;
+    if (summary.low > 0) reviewSummary += `- 🟢 **Low:** ${summary.low}\n`;
 
     if (Object.keys(categoryCounts).length > 0) {
-        summary += `\n### Issues by Category\n`;
+        reviewSummary += `\n### Issues by Category\n`;
         Object.entries(categoryCounts)
             .sort((a, b) => b[1] - a[1])
             .forEach(([cat, count]) => {
-                summary += `- **${cat}:** ${count}\n`;
+                reviewSummary += `- **${cat}:** ${count}\n`;
             });
     }
 
     if (severityCounts.critical > 0 || severityCounts.high > 0) {
-        summary += `\n**Action Required:** Please address critical and high severity issues before merging.`;
+        reviewSummary += `\n**Action Required:** Please address critical and high severity issues before merging.`;
     } else {
-        summary += `\n**Good to go!** No critical or high severity issues found.`;
+        reviewSummary += `\n**Good to go!** No critical or high severity issues found.`;
     }
 
-    return summary;
+    return reviewSummary;
 }
 
 // Run the script

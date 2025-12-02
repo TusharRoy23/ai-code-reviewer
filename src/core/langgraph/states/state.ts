@@ -30,6 +30,7 @@ export const ReviewState = Annotation.Root({
         default: () => ({
             summary: {
                 totalIssues: 0,
+                totalFilesReviewed: 0,
                 [Severity.CRITICAL]: 0,
                 [Severity.MEDIUM]: 0,
                 [Severity.HIGH]: 0,
