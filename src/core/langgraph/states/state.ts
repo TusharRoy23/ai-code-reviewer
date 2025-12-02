@@ -1,6 +1,6 @@
 // graph/states/state.ts
 import { Annotation } from "@langchain/langgraph";
-import type { FileContext, AgentPlan, Review } from "../utils/types.ts";
+import { type FileContext, type AgentPlan, type Review, type FinalizeReview, Severity } from "../utils/types.ts";
 
 export const ReviewState = Annotation.Root({
     // Input
@@ -25,8 +25,17 @@ export const ReviewState = Annotation.Root({
     }),
 
     // Phase 4: Final output
-    finalReview: Annotation<string>({
+    finalReview: Annotation<FinalizeReview>({
         reducer: (state, update) => update,
-        default: () => ""
+        default: () => ({
+            summary: {
+                totalIssues: 0,
+                [Severity.CRITICAL]: 0,
+                [Severity.MEDIUM]: 0,
+                [Severity.HIGH]: 0,
+                [Severity.LOW]: 0
+            },
+            findings: []
+        })
     })
 });

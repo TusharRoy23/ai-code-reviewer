@@ -2,7 +2,7 @@ import { agentConcurrency } from "../../../config/concurrency.ts";
 import { shouldSkipFile, isSimpleChange, getFilePriority, deduplicateIssues, AGENT_MAP } from "../../../utils/helper.ts";
 import type { IReviewerNodes } from "../interface/IReviewer.nodes.ts";
 import type { ReviewState } from "../states/state.ts";
-import { Priority, type AgentPlan, type Chunk, type FileContext } from "../utils/types.ts";
+import { Priority, Severity, type AgentPlan, type Chunk, type FileContext } from "../utils/types.ts";
 import { ContextEnricher } from "../utils/context-enricher.ts";
 import { coordinatorAgent } from "../agents/coordinator.agent.ts";
 
@@ -228,7 +228,7 @@ export class ReviewerNodes implements IReviewerNodes {
 
                             // Filter to only high/critical for noise reduction
                             issues = issues.filter((issue: any) =>
-                                issue.severity === 'high' || issue.severity === 'critical'
+                                issue.severity === Severity.HIGH || issue.severity === Severity.CRITICAL
                             );
 
                             console.log(`   ${agentName}: Found ${issues.length} high/critical issues`);
@@ -279,44 +279,28 @@ export class ReviewerNodes implements IReviewerNodes {
             const allIssues = state.reviews.flatMap(r => r.issues);
 
             if (allIssues.length === 0) {
-                console.log(`✅ No issues found!`);
                 return {
-                    finalReview: JSON.stringify({
+                    finalReview: {
                         summary: {
                             totalIssues: 0,
-                            critical: 0,
-                            high: 0,
-                            medium: 0,
-                            low: 0,
-                            verdict: "✅ Code looks good! No significant issues found."
+                            [Severity.CRITICAL]: 0,
+                            [Severity.MEDIUM]: 0,
+                            [Severity.HIGH]: 0,
+                            [Severity.LOW]: 0
                         },
-                        findings: []
-                    }, null, 2)
+                        findings: [],
+                        verdict: "No issues found!"
+                    }
                 };
             }
 
-            // Group issues by severity
-            const stats = {
-                critical: allIssues.filter(i => i.severity === 'critical').length,
-                high: allIssues.filter(i => i.severity === 'high').length,
-                medium: allIssues.filter(i => i.severity === 'medium').length,
-                low: allIssues.filter(i => i.severity === 'low').length,
-            };
-
-            console.log(`   Critical: ${stats.critical}`);
-            console.log(`   High: ${stats.high}`);
-            console.log(`   Medium: ${stats.medium}`);
-            console.log(`   Low: ${stats.low}`);
-
-            // Create final output
-            const finalOutput = {
+            const finalReview = {
                 summary: {
                     totalIssues: allIssues.length,
-                    ...stats,
-                    verdict: stats.critical > 0
-                        ? `⛔ ${stats.critical} CRITICAL issue(s) found - requires immediate attention`
-                        : stats.high > 0
-                            ? `⚠️${stats.high} HIGH priority issue(s) found` : `✅ Code looks good with ${allIssues.length} minor suggestions`
+                    [Severity.CRITICAL]: allIssues.filter(i => i.severity === Severity.CRITICAL).length,
+                    [Severity.HIGH]: allIssues.filter(i => i.severity === Severity.HIGH).length,
+                    [Severity.MEDIUM]: allIssues.filter(i => i.severity === Severity.MEDIUM).length,
+                    [Severity.LOW]: allIssues.filter(i => i.severity === Severity.LOW).length,
                 },
                 findings: state.reviews.map(review => ({
                     file: review.filename,
@@ -325,15 +309,22 @@ export class ReviewerNodes implements IReviewerNodes {
                 }))
             };
             return {
-                finalReview: JSON.stringify(finalOutput, null, 2)
+                finalReview
             };
         } catch (error) {
             console.error("❌ Error in finalizeReview:", error);
             return {
-                finalReview: JSON.stringify({
-                    error: "Failed to synthesize review",
-                    details: String(error)
-                }, null, 2)
+                finalReview: {
+                    summary: {
+                        totalIssues: 0,
+                        [Severity.CRITICAL]: 0,
+                        [Severity.MEDIUM]: 0,
+                        [Severity.HIGH]: 0,
+                        [Severity.LOW]: 0
+                    },
+                    findings: [],
+                    verdict: "Error in finalizeReview"
+                },
             };
         }
     }

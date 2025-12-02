@@ -7,6 +7,13 @@ export enum Priority {
     LOW = 'low'
 }
 
+export enum Severity {
+    CRITICAL = 'critical',
+    HIGH = 'high',
+    MEDIUM = 'medium',
+    LOW = 'low'
+}
+
 export enum Agents {
     SECURITY = 'security',
     PERFORMANCE = 'performance',
@@ -77,4 +84,24 @@ export interface Review {
     filename: string;
     agentType: string;
     issues: Issue[];
+}
+
+export type Summary = {
+    totalIssues: number;
+    [Severity.CRITICAL]: number;
+    [Severity.HIGH]: number;
+    [Severity.LOW]: number;
+    [Severity.MEDIUM]: number;
+}
+
+export type Findings = {
+    file: string;
+    agent: string;
+    issues: Issue[];
+}
+
+export type FinalizeReview = {
+    summary: Summary;
+    findings: Findings[];
+    verdict?: string;
 }
