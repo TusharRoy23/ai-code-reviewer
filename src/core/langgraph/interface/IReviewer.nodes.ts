@@ -1,8 +1,9 @@
 import type { ReviewState } from "../states/state.ts";
-import type { Chunk } from "../utils/types.ts";
+import type { AgentPlan, FileContext } from "../utils/types.ts";
 
 export interface IReviewerNodes {
-    splitIntoChunks(state: typeof ReviewState.State): Partial<typeof ReviewState.State>;
-    reviewEachChunk(state: { chunkData: Chunk }): Promise<Partial<typeof ReviewState.State>>;
-    finalizeReview(state: typeof ReviewState.State): Partial<typeof ReviewState.State>;
+    splitAndEnrichChunks(state: typeof ReviewState.State): Partial<typeof ReviewState.State>;
+    coordinateReview(state: { chunkData: FileContext }): Promise<Partial<typeof ReviewState.State>>
+    reviewWithAgents(state: { chunkData: FileContext; plan: AgentPlan; }): Promise<Partial<typeof ReviewState.State>>;
+    finalizeReview(state: typeof ReviewState.State): Promise<Partial<typeof ReviewState.State>>;
 }

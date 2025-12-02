@@ -1,14 +1,21 @@
 import { agentConcurrency } from "../../../config/concurrency.ts";
-import { shouldSkipFile, isSimpleChange, getFilePriority, selectAgentsForFile, reviewAgents, deduplicateIssues } from "../../../utils/helper.ts";
+import { shouldSkipFile, isSimpleChange, getFilePriority, AGENT_MAP } from "../../../utils/helper.ts";
 import type { IReviewerNodes } from "../interface/IReviewer.nodes.ts";
 import type { ReviewState } from "../states/state.ts";
-import type { Chunk } from "../utils/types.ts";
+import { Priority, Severity, type AgentPlan, type Chunk, type FileContext } from "../utils/types.ts";
+import { ContextEnricher } from "../utils/context-enricher.ts";
+import { coordinatorAgent } from "../agents/coordinator.agent.ts";
 
 export class ReviewerNodes implements IReviewerNodes {
-    splitIntoChunks(state: typeof ReviewState.State): Partial<typeof ReviewState.State> {
+    private contextEnricher = new ContextEnricher();
+
+    // ============================================
+    // PHASE 1: Split and Enrich Context
+    // ============================================
+    splitAndEnrichChunks(state: typeof ReviewState.State): Partial<typeof ReviewState.State> {
         try {
             const input = state.rawInput.trim();
-            const chunks: Chunk[] = [];
+            const chunks: FileContext[] = [];
 
             if (input.startsWith("diff --git") || input.includes("diff --git")) {
                 const fileSections = input
@@ -16,137 +23,316 @@ export class ReviewerNodes implements IReviewerNodes {
                     .filter(Boolean)
                     .map((section: any) => `diff --git ${section}`);
 
-                // Parse and filter chunks
                 fileSections.forEach((content: string, i: number) => {
                     const filenameMatch = content.match(/ b\/(.+?)(\s|$)/);
-                    const filename = filenameMatch ? filenameMatch[1] : `file_${i}`;
+                    const filename = filenameMatch ? filenameMatch[1] : null;
+                    if (filename) {
+                        // Skip unwanted files
+                        if (shouldSkipFile(filename)) {
+                            console.log(`⏭️  Skipping: ${filename}`);
+                            return;
+                        }
 
-                    // Skip unwanted files
-                    if (shouldSkipFile(filename)) {
-                        return;
+                        // Skip simple changes (whitespace, comments only)
+                        if (isSimpleChange(content)) {
+                            console.log(`⏭️  Skipping simple change: ${filename}`);
+                            return;
+                        }
+
+                        // Create basic chunk
+                        const basicChunk: Chunk = {
+                            id: `${i}`,
+                            filename,
+                            content,
+                        };
+
+                        // Enrich with full context
+                        const enrichedChunk = this.contextEnricher.enrichChunk(basicChunk);
+                        chunks.push(enrichedChunk);
+
+                        console.log(`✅ Enriched: ${filename} (${enrichedChunk.linesAdded}+ ${enrichedChunk.linesRemoved}-)`);
                     }
-
-                    // Skip simple changes
-                    if (isSimpleChange(content)) {
-                        return;
-                    }
-
-                    chunks.push({
-                        id: `${i}`,
-                        filename,
-                        content,
-                    });
                 });
 
-                // Sort by priority (review important files first)
-                chunks.sort((a, b) =>
-                    getFilePriority(b.filename ?? "") - getFilePriority(a.filename ?? "")
-                );
+                // Sort by priority (critical files first)
+                chunks.sort((a, b) => {
+                    const priorityA = getFilePriority(a.filename);
+                    const priorityB = getFilePriority(b.filename);
+                    return priorityB - priorityA;
+                });
 
-                return {
-                    chunks
-                };
+                console.log(`\n📦 Total files to review: ${chunks.length}`);
+                return { chunks };
             } else {
-                chunks.push({
+                // Single snippet (not a diff)
+                const basicChunk: Chunk = {
                     id: "0",
                     filename: "snippet.txt",
                     content: input,
-                });
-                return { chunks };
+                };
+                const enrichedChunk = this.contextEnricher.enrichChunk(basicChunk);
+                return { chunks: [enrichedChunk] };
             }
         } catch (error) {
+            console.error("❌ Error in splitAndEnrichChunks:", error);
             return { chunks: [] };
         }
     }
 
-    async reviewEachChunk(state: { chunkData: Chunk; }): Promise<Partial<typeof ReviewState.State>> {
+    // ============================================
+    // PHASE 2: Coordinator Plans Review (NEW)
+    // ============================================
+    async coordinateReview(state: { chunkData: FileContext }): Promise<Partial<typeof ReviewState.State>> {
         const { chunkData } = state;
 
-        if (!chunkData) {
-            console.error("No chunk data provided");
+        try {
+            console.log(`\n🧭 Coordinating review for: ${chunkData.filename}`);
+
+            // Build context for coordinator
+            const coordinatorInput = `
+            **File:** ${chunkData.filename}
+            **Type:** ${chunkData.fileType}
+            **Lines Changed:** +${chunkData.linesAdded} -${chunkData.linesRemoved}
+            **Functions Changed:** ${chunkData.functionsChanged.join(', ') || 'None'}
+            **Classes Changed:** ${chunkData.classesChanged.join(', ') || 'None'}
+            **Has Tests:** ${chunkData.hasTests ? 'Yes' : 'No'}
+
+            **Diff Summary (first 500 chars):**
+            ${chunkData.diff.slice(0, 500)}
+            ${chunkData.diff.length > 500 ? '...' : ''}
+            `;
+
+            const result = await coordinatorAgent.invoke({
+                messages: [{ role: "user", content: coordinatorInput }]
+            });
+
+            const lastContent = result.messages.at(-1)?.content;
+            let plan: AgentPlan;
+
+            if (typeof lastContent === "string") {
+                const sanitized = lastContent.replace(/```(json)?/g, '').trim();
+                const parsed = JSON.parse(sanitized);
+
+                plan = {
+                    filename: chunkData.filename,
+                    agents: parsed.agents || [],
+                    priority: parsed.priority || Priority.NORMAL,
+                    reasoning: parsed.reasoning || 'No reasoning provided'
+                };
+
+                console.log(`   Agents selected: ${plan?.agents?.join(', ')}`);
+                console.log(`   Priority: ${plan?.priority}`);
+                console.log(`   Reasoning: ${plan?.reasoning}`);
+            } else {
+                // Fallback: run all agents
+                plan = {
+                    filename: chunkData.filename,
+                    agents: ['security', 'performance', 'bugs', 'idiomatic'],
+                    priority: Priority.NORMAL,
+                    reasoning: 'Coordinator failed, running default agents'
+                };
+            }
+
+            return { agentPlans: [plan] };
+        } catch (error) {
+            console.error(`❌ Coordinator error for ${chunkData.filename}:`, error);
+
+            // Fallback plan
+            return {
+                agentPlans: [{
+                    filename: chunkData.filename,
+                    agents: ['security', 'performance'],
+                    priority: Priority.NORMAL,
+                    reasoning: 'Error in coordinator, using fallback agents'
+                }]
+            };
+        }
+    }
+
+    // ============================================
+    // PHASE 3: Review with Selected Agents
+    // ============================================
+    async reviewWithAgents(state: {
+        chunkData: FileContext;
+        plan: AgentPlan;
+    }): Promise<Partial<typeof ReviewState.State>> {
+        const { chunkData, plan } = state;
+
+        if (!plan || plan.agents.length === 0) {
+            console.log(`⏭️  No agents selected for ${chunkData.filename}`);
             return { reviews: [] };
         }
 
-        // Smart agent selection based on file type
-        const selectedAgents = selectAgentsForFile(chunkData.filename ?? "", chunkData.content);
-
         try {
-            // Run selected agents in parallel
-            const results = await Promise.allSettled(
-                selectedAgents.map(({ agent }) =>
-                    agentConcurrency(() =>
-                        agent.invoke({
-                            messages: [
-                                {
-                                    role: "user",
-                                    content: `${chunkData.content}`
-                                }
-                            ]
-                        })
-                    )
-                )
-            );
+            console.log(`\n🔍 Reviewing ${chunkData.filename} with agents: ${plan.agents.join(', ')}`);
 
+            // Build rich context for agents
+            const contextForAgents = `
+            **File:** ${chunkData.filename}
+            **Type:** ${chunkData.fileType}
+            **Priority:** ${plan.priority}
+
+            **Git Diff:**
+            \`\`\`diff
+            ${chunkData.diff}
+            \`\`\`
+
+            ${chunkData.contentAfter ? `
+            **Full File Context (after changes):**
+            \`\`\`
+            ${chunkData.contentAfter}
+            \`\`\`
+            ` : ''}
+
+            **Metadata:**
+            - Lines added: ${chunkData.linesAdded}
+            - Lines removed: ${chunkData.linesRemoved}
+            - Functions changed: ${chunkData.functionsChanged.join(', ') || 'None'}
+            - Classes changed: ${chunkData.classesChanged.join(', ') || 'None'}
+            - Has tests: ${chunkData.hasTests ? 'Yes' : 'No'}
+            - Imports added: ${chunkData.importsAdded.join(', ') || 'None'}
+
+            Focus your review on the changed code sections.
+            `;
+
+            // Run selected agents in parallel
+            const agentPromises = plan.agents.map(agentName => {
+                const agent = AGENT_MAP[agentName];
+                if (!agent) {
+                    console.warn(`⚠️  Agent not found: ${agentName}`);
+                    return Promise.resolve(null);
+                }
+
+                return agentConcurrency(() =>
+                    agent.invoke({
+                        messages: [{ role: "user", content: contextForAgents }]
+                    })
+                );
+            });
+
+            const results = await Promise.allSettled(agentPromises);
+
+            // Process results
             const allReviews = results.map((res, index) => {
-                const agentName = reviewAgents.at(index)?.name;
-                if (res.status === "fulfilled") {
+                const agentName = plan.agents[index];
+
+                if (res.status === "fulfilled" && res.value) {
                     const messages = res.value?.messages;
-                    const lastContent = messages.at(-1)?.content;
+                    const lastContent = messages?.at(-1)?.content;
                     let issues = [];
 
                     if (typeof lastContent === "string" && lastContent.trim()) {
                         try {
-                            // Remove Markdown fences ``` or ```json
                             const sanitized = lastContent.replace(/```(json|diff)?/g, '').trim();
                             const parsed = JSON.parse(sanitized);
                             issues = parsed.issues || [];
 
-                            // Filter out low-severity issues for noise reduction
+                            // Filter to only high/critical for noise reduction
                             issues = issues.filter((issue: any) =>
-                                issue.severity === 'high' ||
-                                issue.severity === 'critical'
+                                issue.severity === Severity.HIGH || issue.severity === Severity.CRITICAL
                             );
 
+                            console.log(`   ${agentName}: Found ${issues.length} high/critical issues`);
                         } catch (err) {
-                            console.error(`Failed to parse ${agentName} output:`, err);
-                            // Log the problematic content for debugging
-                            console.error(`Raw content: ${lastContent.substring(0, 200)}...`);
+                            console.error(`❌ Failed to parse ${agentName} output:`, err);
                         }
                     }
+
                     return {
-                        type: agentName,
+                        chunkId: chunkData.id,
+                        filename: chunkData.filename,
+                        agentType: agentName,
                         issues
                     };
                 } else {
-                    console.error(`${agentName} failed:`, res.reason);
-                    return { type: agentName, issues: [], error: String(res.reason) };
+                    console.error(`❌ ${agentName} failed:`, res.status === 'rejected' ? res.reason : 'Unknown error');
+                    return {
+                        chunkId: chunkData.id,
+                        filename: chunkData.filename,
+                        agentType: agentName,
+                        issues: []
+                    };
                 }
             });
 
             // Filter out empty reviews
-            const filteredAllReviews = allReviews.filter(r => r.issues?.length > 0);
+            const filteredReviews = allReviews.filter(r => r.issues?.length > 0);
 
-            // Deduplicate similar issues (reduce noise)
-            const deduplicatedReviews = deduplicateIssues(filteredAllReviews);
-
-            return {
-                reviews: [
-                    {
-                        chunkId: chunkData.id,
-                        filename: chunkData.filename ?? '',
-                        issues: deduplicatedReviews,
-                    },
-                ],
-            };
+            return { reviews: filteredReviews };
         } catch (error) {
-            console.error(`Error reviewing chunk ${chunkData.filename}:`, error);
+            console.error(`❌ Error reviewing ${chunkData.filename}:`, error);
             return { reviews: [] };
         }
     }
 
-    finalizeReview(state: typeof ReviewState.State): Partial<typeof ReviewState.State> {
-        return {
-            finalReview: state.reviews.toString(), //! NEED TO CHECK THIS NODE
-        };
+    // ============================================
+    // PHASE 4: Synthesize Final Review (UPDATED)
+    // ============================================
+    async finalizeReview(state: typeof ReviewState.State): Promise<Partial<typeof ReviewState.State>> {
+        try {
+            console.log(`\n📊 Synthesizing final review...`);
+
+            const allIssues = state.reviews.flatMap(r => r.issues);
+
+            if (allIssues.length === 0) {
+                return {
+                    finalReview: {
+                        summary: {
+                            totalIssues: 0,
+                            totalFilesReviewed: 0,
+                            [Severity.CRITICAL]: 0,
+                            [Severity.MEDIUM]: 0,
+                            [Severity.HIGH]: 0,
+                            [Severity.LOW]: 0
+                        },
+                        findings: [],
+                        verdict: "No issues found!"
+                    }
+                };
+            }
+            const totalFileReviewed: Record<string, number> = {};
+
+            const findings = state.reviews?.map(review => {
+                if (!totalFileReviewed[review.filename]) {
+                    totalFileReviewed[review.filename] = 1;
+                }
+                return {
+                    file: review.filename,
+                    agent: review.agentType,
+                    issues: review.issues
+                };
+            });
+
+            const finalReview = {
+                summary: {
+                    totalIssues: allIssues.length,
+                    totalFilesReviewed: Object.keys(totalFileReviewed).length,
+                    [Severity.CRITICAL]: allIssues.filter(i => i.severity === Severity.CRITICAL).length,
+                    [Severity.HIGH]: allIssues.filter(i => i.severity === Severity.HIGH).length,
+                    [Severity.MEDIUM]: allIssues.filter(i => i.severity === Severity.MEDIUM).length,
+                    [Severity.LOW]: allIssues.filter(i => i.severity === Severity.LOW).length,
+                },
+                findings
+            };
+            return {
+                finalReview
+            };
+        } catch (error) {
+            console.error("❌ Error in finalizeReview:", error);
+            return {
+                finalReview: {
+                    summary: {
+                        totalIssues: 0,
+                        totalFilesReviewed: 0,
+                        [Severity.CRITICAL]: 0,
+                        [Severity.MEDIUM]: 0,
+                        [Severity.HIGH]: 0,
+                        [Severity.LOW]: 0
+                    },
+                    findings: [],
+                    verdict: "Error in finalizeReview"
+                },
+            };
+        }
     }
 }
