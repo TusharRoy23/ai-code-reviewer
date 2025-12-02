@@ -1,6 +1,6 @@
-// agents/makeAgent.ts
-import { createAgent } from "langchain";
+import { createAgent, initChatModel } from "langchain";
 import { z } from "zod";
+import { getLLMConfig } from "../utils/llm-config.ts";
 
 interface AgentOptions {
   name: string;
@@ -32,9 +32,13 @@ const AgentPlanSchema = z.object({
   reasoning: z.string(),
 });
 
+const { modelId, apiKey } = getLLMConfig();
+const model = await initChatModel(modelId, {
+  apiKey: apiKey,
+});
+
 export function makeAgent({
   name,
-  model = "gpt-4o-mini",
   systemPrompt,
   tools = [],
   responseSchema,

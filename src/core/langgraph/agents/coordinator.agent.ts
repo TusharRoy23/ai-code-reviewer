@@ -1,7 +1,7 @@
-// agents/coordinator.agent.ts
 import { z } from "zod";
 import { Agents, Priority } from "../utils/types.ts";
-import { createAgent } from "langchain";
+import { createAgent, initChatModel } from "langchain";
+import { getLLMConfig } from "../utils/llm-config.ts";
 
 const coordinatorSchema = z.object({
     agents: z.enum(Agents),
@@ -37,9 +37,14 @@ const prompt = `You are a coordinator agent that analyzes code changes and deter
 
 Analyze the file and return a plan with provided responseFormat.`;
 
+const { modelId, apiKey } = getLLMConfig();
+const model = await initChatModel(modelId, {
+    apiKey: apiKey,
+});
+
 export const coordinatorAgent = createAgent({
     name: "coordinator-agent",
-    model: "gpt-4o-mini",
+    model,
     systemPrompt: prompt,
     responseFormat: coordinatorSchema
 });

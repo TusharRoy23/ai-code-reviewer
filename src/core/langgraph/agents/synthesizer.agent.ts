@@ -1,4 +1,3 @@
-// agents/synthesizer.agent.ts
 import { makeAgent } from "./makeAgent.ts";
 
 const prompt = `You are a synthesizer agent that combines findings from multiple review agents into a coherent summary.
@@ -27,6 +26,6 @@ const prompt = `You are a synthesizer agent that combines findings from multiple
 Be concise and actionable.`;
 
 export const synthesizerAgent = makeAgent({
-    name: "synthesizer-agent",
-    systemPrompt: prompt,
+  name: "synthesizer-agent",
+  systemPrompt: prompt,
 });
