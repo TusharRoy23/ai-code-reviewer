@@ -29,13 +29,11 @@ export class ReviewerNodes implements IReviewerNodes {
                     if (filename) {
                         // Skip unwanted files
                         if (shouldSkipFile(filename)) {
-                            console.log(`⏭️  Skipping: ${filename}`);
                             return;
                         }
 
                         // Skip simple changes (whitespace, comments only)
                         if (isSimpleChange(content)) {
-                            console.log(`⏭️  Skipping simple change: ${filename}`);
                             return;
                         }
 
@@ -49,8 +47,6 @@ export class ReviewerNodes implements IReviewerNodes {
                         // Enrich with full context
                         const enrichedChunk = this.contextEnricher.enrichChunk(basicChunk);
                         chunks.push(enrichedChunk);
-
-                        console.log(`✅ Enriched: ${filename} (${enrichedChunk.linesAdded}+ ${enrichedChunk.linesRemoved}-)`);
                     }
                 });
 
@@ -61,7 +57,6 @@ export class ReviewerNodes implements IReviewerNodes {
                     return priorityB - priorityA;
                 });
 
-                console.log(`\n📦 Total files to review: ${chunks.length}`);
                 return { chunks };
             } else {
                 // Single snippet (not a diff)
@@ -86,8 +81,6 @@ export class ReviewerNodes implements IReviewerNodes {
         const { chunkData } = state;
 
         try {
-            console.log(`\n🧭 Coordinating review for: ${chunkData.filename}`);
-
             // Build context for coordinator
             const coordinatorInput = `
             **File:** ${chunkData.filename}
@@ -97,9 +90,9 @@ export class ReviewerNodes implements IReviewerNodes {
             **Classes Changed:** ${chunkData.classesChanged.join(', ') || 'None'}
             **Has Tests:** ${chunkData.hasTests ? 'Yes' : 'No'}
 
-            **Diff Summary (first 500 chars):**
-            ${chunkData.diff.slice(0, 500)}
-            ${chunkData.diff.length > 500 ? '...' : ''}
+            **Diff Summary (first 1000 chars):**
+            ${chunkData.diff.slice(0, 1000)}
+            ${chunkData.diff.length > 1000 ? '...' : ''}
             `;
 
             const result = await coordinatorAgent.invoke({
@@ -119,10 +112,6 @@ export class ReviewerNodes implements IReviewerNodes {
                     priority: parsed.priority || Priority.NORMAL,
                     reasoning: parsed.reasoning || 'No reasoning provided'
                 };
-
-                console.log(`   Agents selected: ${plan?.agents?.join(', ')}`);
-                console.log(`   Priority: ${plan?.priority}`);
-                console.log(`   Reasoning: ${plan?.reasoning}`);
             } else {
                 // Fallback: run all agents
                 plan = {
@@ -159,13 +148,10 @@ export class ReviewerNodes implements IReviewerNodes {
         const { chunkData, plan } = state;
 
         if (!plan || plan.agents.length === 0) {
-            console.log(`No agents selected for ${chunkData.filename}`);
             return { reviews: [] };
         }
 
         try {
-            console.log(`\nReviewing ${chunkData.filename} with agents: ${plan.agents.join(', ')}`);
-
             // ============================================
             // BUILD SMART CONTEXT FOR AGENTS
             // ============================================
@@ -207,8 +193,6 @@ export class ReviewerNodes implements IReviewerNodes {
                             issues = issues.filter((issue: any) =>
                                 issue.severity === Severity.HIGH || issue.severity === Severity.CRITICAL
                             );
-
-                            console.log(`${agentName}: Found ${issues.length} high/critical issues`);
                         } catch (err) {
                             console.error(`Failed to parse ${agentName} output:`, err);
                         }
@@ -246,8 +230,6 @@ export class ReviewerNodes implements IReviewerNodes {
     // ============================================
     async finalizeReview(state: typeof ReviewState.State): Promise<Partial<typeof ReviewState.State>> {
         try {
-            console.log(`\n📊 Synthesizing final review...`);
-
             const allIssues = state.reviews.flatMap(r => r.issues);
 
             if (allIssues.length === 0) {
@@ -387,19 +369,19 @@ export class ReviewerNodes implements IReviewerNodes {
                     if (!func.isNew && func.bodyBefore && func.bodyAfter) {
                         parts.push(`**Before:**`);
                         parts.push('```');
-                        parts.push(this.truncate(func.bodyBefore, 800));
+                        parts.push(this.truncate(func.bodyBefore, 200));
                         parts.push('```');
                         parts.push('');
 
                         parts.push(`**After:**`);
                         parts.push('```');
-                        parts.push(this.truncate(func.bodyAfter, 800));
+                        parts.push(this.truncate(func.bodyAfter, 200));
                         parts.push('```');
                     } else if (func.bodyAfter) {
                         // Show just the new function
                         parts.push(`**Code:**`);
                         parts.push('```');
-                        parts.push(this.truncate(func.bodyAfter, 1000));
+                        parts.push(this.truncate(func.bodyAfter, 200));
                         parts.push('```');
                     }
 
