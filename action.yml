@@ -15,7 +15,7 @@ inputs:
     description: "Review mode: 'full' (entire PR) or 'incremental' (latest commit only)"
     default: "incremental"
 
-  llm-model:
+  llm:
     description: "Large Language Model. Ex: gpt-4o-mini, deepseek-coder, etc."
     required: false
     default: "gpt-4o-mini"
@@ -217,7 +217,7 @@ runs:
         # Run the detector script from action directory
         INFO=$(node ${{ github.action_path }}/scripts/project-info-detector.js)
 
-        echo "LLM_MODEL=${{ inputs.llm-model }}" >> $GITHUB_ENV
+        echo "LLM=${{ inputs.llm }}" >> $GITHUB_ENV
         echo "LLM_API_KEY=${{ inputs.llm-api-key }}" >> $GITHUB_ENV
 
         # Check if INFO is valid JSON

@@ -55,6 +55,8 @@ jobs:
         with:
           trigger-phrase: "@ai-code-reviewer review"
           review-mode: "incremental"
+          llm: ${{ secrets.LLM }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
 ```
 
 ### Usage Modes
@@ -73,6 +75,13 @@ Comment on PR with trigger phrase to review on demand:
 @ai-code-reviewer review
 ```
 
+#### 2️⃣ Run query on provided LLM
+Pass your own LLM & API_KEY via GitHub Repository Secrets:
+```
+llm: ${{ secrets.LLM }}
+llm-api-key: ${{ secrets.LLM_API_KEY }}
+```
+
 ---
 
 ## ⚙️ Configuration
@@ -81,6 +90,8 @@ Comment on PR with trigger phrase to review on demand:
 |--------|-------------|---------|----------|
 | `trigger-phrase` | Keyword to manually trigger review | `@ai-code-reviewer review` | ❌ No |
 | `review-mode` | `incremental` (latest commit) or `full` (entire PR) | `incremental` | ❌ No |
+| `llm` | `deepseek-coder`, `gpt-4o-mini`, etc. | `gpt-4o-mini` | ❌ No |
+| `llm-api-key` | API KEY for LLM call | | ❌ No |
 
 ### Review Modes
 
@@ -135,6 +146,11 @@ permissions:
 
 The action analyzes code across six key dimensions:
 
+### 👥 Coordinator
+- Decide agents need
+- Return planned prompt
+- Agent Selection
+
 ### 🏗️ Architecture
 - Design patterns
 - Code organization
@@ -165,7 +181,13 @@ The action analyzes code across six key dimensions:
 - Input validation
 - Sensitive data handling
 
-### ✅ Testing
+### 🪲 Bug
+- Logical Errors
+- State & Data Mutations
+- Async / Concurrency Bugs
+- Error Handling Failures & more
+
+### 🧪 Testing
 - Test coverage
 - Test quality
 - Edge cases
@@ -236,7 +258,7 @@ To protect against abuse, the action includes:
 1. ✅ Check `permissions: { id-token: write }` is set
 2. ✅ Verify `fetch-depth: 0` in checkout step
 3. ✅ Check workflow trigger events (PR or issue_comment)
-4. ✅ Ensure action is using latest version `@v5`
+4. ✅ Ensure action is using latest version `@v6`
 
 ### No comments appearing?
 

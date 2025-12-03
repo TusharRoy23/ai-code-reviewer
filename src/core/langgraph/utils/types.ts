@@ -1,5 +1,3 @@
-// graph/utils/types.ts
-
 export enum Priority {
     CRITICAL = 'critical',
     HIGH = 'high',
@@ -30,7 +28,48 @@ export interface Chunk {
     content: string; // git diff
 }
 
-// NEW: Enriched file context
+// Function/method details
+export interface FunctionInfo {
+    name: string;
+    signature: string;
+    bodyBefore: string | null;
+    bodyAfter: string | null;
+    lineStart: number;
+    lineEnd: number;
+    isModified: boolean;
+    isNew: boolean;
+    isDeleted: boolean;
+    complexity?: number; // cyclomatic complexity
+}
+
+// Type/interface details
+export interface TypeInfo {
+    name: string;
+    definition: string;
+    kind: 'interface' | 'type' | 'class' | 'enum' | 'struct';
+    lineNumber: number;
+}
+
+// Security context
+export interface SecurityContext {
+    hasUserInput: boolean;         // req.body, req.query, argv, etc.
+    hasDatabaseQuery: boolean;     // SQL, db.query, execute
+    hasFileOperation: boolean;     // fs.read, open, write
+    hasNetworkCall: boolean;       // fetch, http, axios
+    hasAuthCode: boolean;          // login, authenticate, token
+    hasCryptoOperation: boolean;   // encrypt, hash, crypto
+    exposesAPI: boolean;           // @route, app.get, express
+}
+
+// Call graph info
+export interface CallGraphNode {
+    functionName: string;
+    calledBy: string[];      // Functions that call this
+    calls: string[];         // Functions this one calls
+    isChangedFunction: boolean;
+}
+
+// Enriched file context
 export interface FileContext {
     id: string;
     filename: string;
@@ -59,9 +98,19 @@ export interface FileContext {
     // Context
     hasTests: boolean;
     relatedFiles: string[];
+
+    // Smart context
+    functionDetails: FunctionInfo[];     // Full function bodies, not just names
+    typeDefinitions: TypeInfo[];          // Interfaces, types, classes
+    callGraph: CallGraphNode[];           // Who calls whom
+    securityContext: SecurityContext;     // Security-relevant patterns
+    changedCode: {                        // The actual changed code blocks
+        additions: string[];
+        deletions: string[];
+    };
 }
 
-// NEW: Agent plan from coordinator
+// Agent plan from coordinator
 export interface AgentPlan {
     filename: string;
     agents: string[]; // e.g., ['security', 'performance']
