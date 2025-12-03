@@ -1,10 +1,10 @@
 import { createAgent, initChatModel } from "langchain";
 import { z } from "zod";
 import { getLLMConfig } from "../utils/llm-config.ts";
+import { Priority, Severity } from "../utils/types.ts";
 
 interface AgentOptions {
   name: string;
-  model?: string;
   systemPrompt: string;
   tools?: any[];
   responseSchema?: z.ZodType<any>;
@@ -13,7 +13,7 @@ interface AgentOptions {
 const IssueSchema = z.object({
   type: z.string(),
   description: z.string(),
-  severity: z.enum(["low", "medium", "high", "critical"]),
+  severity: z.enum(Severity),
   recommendation: z.string(),
   lineStart: z.number(),
   lineEnd: z.number(),
@@ -28,7 +28,7 @@ const ReviewSchema = z.object({
 // For coordinator
 const AgentPlanSchema = z.object({
   agents: z.array(z.string()),
-  priority: z.enum(["critical", "high", "normal", "low"]),
+  priority: z.enum(Priority),
   reasoning: z.string(),
 });
 
@@ -62,7 +62,7 @@ export function makeAgent({
 4. If no issues found, return {"issues": []}
 `.trim();
 
-  // Use custom schema if provided (for coordinator), otherwise use default ReviewSchema
+  // Use custom schema if provided (for coordinator agent), otherwise use default ReviewSchema
   const schema = responseSchema || ReviewSchema;
 
   return createAgent({
