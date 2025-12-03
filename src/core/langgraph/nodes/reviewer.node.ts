@@ -310,9 +310,51 @@ export class ReviewerNodes implements IReviewerNodes {
         parts.push(`**Changes:** +${ctx.linesAdded} -${ctx.linesRemoved} lines`);
         parts.push('');
 
-        // ============================================
-        // SECURITY CONTEXT (if relevant)
-        // ============================================
+        this.securityContext(ctx, parts);
+        this.modifiedFunctions(ctx, parts);
+        this.typeDefinition(ctx, parts);
+        this.callGraph(ctx, parts);
+        this.checkImports(ctx, parts);
+        this.getChangedBlocks(ctx, parts);
+        this.getGitDiff(ctx, parts);
+        this.getFullFileContext(ctx, parts);
+        this.ifNoTests(ctx, parts);
+        this.instructionForAgents(parts);
+
+        return parts.join('\n');
+    }
+
+    // ============================================
+    // HELPER METHODS
+    // ============================================
+
+    /**
+     * Check if security context has any concerns
+     */
+    private hasSecurityConcerns(ctx: SecurityContext): boolean {
+        return ctx.hasUserInput ||
+            ctx.hasDatabaseQuery ||
+            ctx.hasAuthCode ||
+            ctx.hasCryptoOperation ||
+            ctx.hasFileOperation ||
+            ctx.hasNetworkCall ||
+            ctx.exposesAPI;
+    }
+
+    /**
+     * Truncate text to max length
+     */
+    private truncate(text: string, maxLength: number): string {
+        if (text.length <= maxLength) {
+            return text;
+        }
+        return text.slice(0, maxLength) + '\n... (truncated)';
+    }
+
+    // ============================================
+    // SECURITY CONTEXT (if relevant)
+    // ============================================
+    private securityContext(ctx: FileContext, parts: string[]) {
         if (ctx.securityContext && this.hasSecurityConcerns(ctx.securityContext)) {
             parts.push(`## Security Alert`);
 
@@ -340,10 +382,12 @@ export class ReviewerNodes implements IReviewerNodes {
 
             parts.push('');
         }
+    }
 
-        // ============================================
-        // MODIFIED FUNCTIONS (with full bodies)
-        // ============================================
+    // ============================================
+    // MODIFIED FUNCTIONS (with full bodies)
+    // ============================================
+    private modifiedFunctions(ctx: FileContext, parts: string[]) {
         if (ctx.functionDetails && ctx.functionDetails.length > 0) {
             parts.push(`## Modified Functions`);
             parts.push('');
@@ -392,10 +436,12 @@ export class ReviewerNodes implements IReviewerNodes {
                 parts.push('');
             }
         }
+    }
 
-        // ============================================
-        // TYPE DEFINITIONS (interfaces, types, classes)
-        // ============================================
+    // ============================================
+    // TYPE DEFINITIONS (interfaces, types, classes)
+    // ============================================
+    private typeDefinition(ctx: FileContext, parts: string[]) {
         if (ctx.typeDefinitions && ctx.typeDefinitions.length > 0) {
             parts.push(`## Type Definitions`);
             parts.push('');
@@ -409,10 +455,12 @@ export class ReviewerNodes implements IReviewerNodes {
                 parts.push('');
             });
         }
+    }
 
-        // ============================================
-        // CALL GRAPH (who calls whom)
-        // ============================================
+    // ============================================
+    // CALL GRAPH (who calls whom)
+    // ============================================
+    private callGraph(ctx: FileContext, parts: string[]) {
         if (ctx.callGraph && ctx.callGraph.length > 0) {
             const changedFuncs = ctx.callGraph.filter(node => node.isChangedFunction);
 
@@ -434,10 +482,12 @@ export class ReviewerNodes implements IReviewerNodes {
                 });
             }
         }
+    }
 
-        // ============================================
-        // IMPORTS (added/removed)
-        // ============================================
+    // ============================================
+    // IMPORTS (added/removed)
+    // ============================================
+    private checkImports(ctx: FileContext, parts: string[]) {
         if ((ctx.importsAdded && ctx.importsAdded.length > 0) ||
             (ctx.importsRemoved && ctx.importsRemoved.length > 0)) {
             parts.push(`## Import Changes`);
@@ -451,10 +501,12 @@ export class ReviewerNodes implements IReviewerNodes {
 
             parts.push('');
         }
+    }
 
-        // ============================================
-        // CHANGED CODE BLOCKS (clean additions/deletions)
-        // ============================================
+    // ============================================
+    // CHANGED CODE BLOCKS (clean additions/deletions)
+    // ============================================
+    private getChangedBlocks(ctx: FileContext, parts: string[]) {
         if (ctx.changedCode) {
             if (ctx.changedCode.additions.length > 0) {
                 parts.push(`## Code Additions (${ctx.changedCode.additions.length} blocks)`);
@@ -485,10 +537,12 @@ export class ReviewerNodes implements IReviewerNodes {
                 });
             }
         }
+    }
 
-        // ============================================
-        // GIT DIFF (for reference)
-        // ============================================
+    // ============================================
+    // GIT DIFF (for reference)
+    // ============================================
+    private getGitDiff(ctx: FileContext, parts: string[]) {
         parts.push(`## Git Diff`);
         parts.push('```diff');
         parts.push(this.truncate(ctx.diff, 1500));
@@ -497,10 +551,12 @@ export class ReviewerNodes implements IReviewerNodes {
         }
         parts.push('```');
         parts.push('');
+    }
 
-        // ============================================
-        // FULL FILE CONTEXT (if not too large)
-        // ============================================
+    // ============================================
+    // FULL FILE CONTEXT (if not too large)
+    // ============================================
+    private getFullFileContext(ctx: FileContext, parts: string[]) {
         if (ctx.contentAfter) {
             const fileSize = ctx.contentAfter.length;
 
@@ -523,19 +579,23 @@ export class ReviewerNodes implements IReviewerNodes {
             }
             parts.push('');
         }
+    }
 
-        // ============================================
-        // TESTING INFO
-        // ============================================
+    // ============================================
+    // TESTING INFO
+    // ============================================
+    private ifNoTests(ctx: FileContext, parts: string[]) {
         if (!ctx.hasTests && ctx.fileType !== 'test' && ctx.fileType !== 'config') {
             parts.push(`---`);
             parts.push(`**No test file found** - Consider adding tests for new/changed functions`);
             parts.push('');
         }
+    }
 
-        // ============================================
-        // INSTRUCTIONS FOR AGENT
-        // ============================================
+    // ============================================
+    // INSTRUCTIONS FOR AGENT
+    // ============================================
+    private instructionForAgents(parts: string[]) {
         parts.push(`---`);
         parts.push(`## Review Instructions`);
         parts.push(`- Focus on the **changed code** (additions/modifications)`);
@@ -543,34 +603,5 @@ export class ReviewerNodes implements IReviewerNodes {
         parts.push(`- Reference **line numbers** from the function details`);
         parts.push(`- Be **specific and actionable** in your findings`);
         parts.push(`- Only report **high confidence** issues`);
-
-        return parts.join('\n');
-    }
-
-    // ============================================
-    // HELPER METHODS
-    // ============================================
-
-    /**
-     * Check if security context has any concerns
-     */
-    private hasSecurityConcerns(ctx: SecurityContext): boolean {
-        return ctx.hasUserInput ||
-            ctx.hasDatabaseQuery ||
-            ctx.hasAuthCode ||
-            ctx.hasCryptoOperation ||
-            ctx.hasFileOperation ||
-            ctx.hasNetworkCall ||
-            ctx.exposesAPI;
-    }
-
-    /**
-     * Truncate text to max length
-     */
-    private truncate(text: string, maxLength: number): string {
-        if (text.length <= maxLength) {
-            return text;
-        }
-        return text.slice(0, maxLength) + '\n... (truncated)';
     }
 }
