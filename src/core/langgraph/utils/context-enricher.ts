@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { CallGraphNode, Chunk, FileContext, FunctionInfo, SecurityContext, TypeInfo } from "./types.ts";
+import { ASTParser } from "./ast-parser.ts";
 
 // Language-specific patterns
 interface LanguagePatterns {
@@ -197,6 +198,11 @@ const LANGUAGE_PATTERNS: Record<string, LanguagePatterns> = {
 };
 
 export class ContextEnricher {
+    private astParser: ASTParser;  // NEW
+
+    constructor() {
+        this.astParser = new ASTParser();  // NEW
+    }
 
     enrichChunk(chunk: Chunk): FileContext {
         const filename = chunk.filename;
@@ -216,9 +222,53 @@ export class ContextEnricher {
         // Extract changed line ranges from diff
         const changedLineRanges = this.extractLineRanges(diff);
 
+        let functionsChanged: string[];
+        let classesChanged: string[];
+        let functionDetails: FunctionInfo[];
+        let typeDefinitions: TypeInfo[];
+        let callGraph: CallGraphNode[];
+
+        const tree = contentAfter ? this.astParser.parse(contentAfter, filename) : null;
+        if (tree) {
+            // Get function names from diff (quick regex for names only)
+            functionsChanged = this.extractFunctions(diff, contentAfter, language);
+            classesChanged = this.extractClasses(diff, contentAfter, language);
+
+            // Use AST for detailed extraction
+            functionDetails = this.astParser.extractFunctions(
+                tree,
+                contentAfter!,
+                functionsChanged,
+                changedLineRanges
+            );
+
+            typeDefinitions = this.astParser.extractTypes(tree, contentAfter!);
+
+            callGraph = this.astParser.buildCallGraph(
+                tree,
+                contentAfter!,
+                functionsChanged
+            );
+        } else {
+            // Fallback to regex (your existing code)
+            functionsChanged = this.extractFunctions(diff, contentAfter, language);
+            classesChanged = this.extractClasses(diff, contentAfter, language);
+
+            // Use your existing smart context methods
+            functionDetails = this.extractFunctionDetails(
+                diff,
+                contentBefore,
+                contentAfter,
+                functionsChanged,
+                changedLineRanges,
+                language
+            );
+
+            typeDefinitions = this.extractTypeDefinitions(contentAfter, language);
+            callGraph = this.buildCallGraph(contentAfter, functionsChanged, language);
+        }
+
         // Parse code structure (language-aware)
-        const functionsChanged = this.extractFunctions(diff, contentAfter, language);
-        const classesChanged = this.extractClasses(diff, contentAfter, language);
         const importsAdded = this.extractImports(diff, '+', language);
         const importsRemoved = this.extractImports(diff, '-', language);
 
@@ -236,27 +286,27 @@ export class ContextEnricher {
         // ============================================
 
         // Extract full function bodies (not just names)
-        const functionDetails = this.extractFunctionDetails(
-            diff,
-            contentBefore,
-            contentAfter,
-            functionsChanged,
-            changedLineRanges,
-            language
-        );
+        // functionDetails = this.extractFunctionDetails(
+        //     diff,
+        //     contentBefore,
+        //     contentAfter,
+        //     functionsChanged,
+        //     changedLineRanges,
+        //     language
+        // );
 
         // Extract type definitions
-        const typeDefinitions = this.extractTypeDefinitions(
-            contentAfter,
-            language
-        );
+        // typeDefinitions = this.extractTypeDefinitions(
+        //     contentAfter,
+        //     language
+        // );
 
         // Build call graph
-        const callGraph = this.buildCallGraph(
-            contentAfter,
-            functionsChanged,
-            language
-        );
+        // callGraph = this.buildCallGraph(
+        //     contentAfter,
+        //     functionsChanged,
+        //     language
+        // );
 
         // Detect security-relevant patterns
         const securityContext = this.analyzeSecurityContext(
