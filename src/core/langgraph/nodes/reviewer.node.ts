@@ -109,16 +109,14 @@ export class ReviewerNodes implements IReviewerNodes {
                 plan = {
                     filename: chunkData.filename,
                     agents: parsed.agents || [],
-                    priority: parsed.priority || Priority.NORMAL,
-                    reasoning: parsed.reasoning || 'No reasoning provided'
+                    priority: parsed.priority || Priority.NORMAL
                 };
             } else {
                 // Fallback: run all agents
                 plan = {
                     filename: chunkData.filename,
                     agents: ['security', 'performance', 'bugs', 'idiomatic'],
-                    priority: Priority.NORMAL,
-                    reasoning: 'Coordinator failed, running default agents'
+                    priority: Priority.NORMAL
                 };
             }
 
@@ -131,8 +129,7 @@ export class ReviewerNodes implements IReviewerNodes {
                 agentPlans: [{
                     filename: chunkData.filename,
                     agents: ['security', 'performance'],
-                    priority: Priority.NORMAL,
-                    reasoning: 'Error in coordinator, using fallback agents'
+                    priority: Priority.NORMAL
                 }]
             };
         }
@@ -158,7 +155,7 @@ export class ReviewerNodes implements IReviewerNodes {
             const smartContext = this.buildSmartContext(chunkData, plan);
 
             // Run selected agents in parallel
-            const agentPromises = plan.agents.map(agentName => {
+            const agentPromises = plan?.agents?.map(agentName => {
                 const agent = AGENT_MAP[agentName];
                 if (!agent) {
                     console.warn(`Agent not found: ${agentName}`);

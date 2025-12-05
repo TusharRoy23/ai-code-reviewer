@@ -1,7 +1,7 @@
 import { createAgent, initChatModel } from "langchain";
 import { z } from "zod";
 import { getLLMConfig } from "../utils/llm-config.ts";
-import { Priority, Severity } from "../utils/types.ts";
+import { Severity } from "../utils/types.ts";
 
 interface AgentOptions {
   name: string;
@@ -23,13 +23,6 @@ const IssueSchema = z.object({
 
 const ReviewSchema = z.object({
   issues: z.array(IssueSchema),
-});
-
-// For coordinator
-const AgentPlanSchema = z.object({
-  agents: z.array(z.string()),
-  priority: z.enum(Priority),
-  reasoning: z.string(),
 });
 
 const { modelId, apiKey } = getLLMConfig();
@@ -73,6 +66,3 @@ export function makeAgent({
     responseFormat: schema
   });
 }
-
-// Export schemas for use elsewhere
-export { ReviewSchema, AgentPlanSchema };

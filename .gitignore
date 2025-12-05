@@ -47,3 +47,4 @@ jspm_packages/
 *.swo
 
 *.toml
+.pnpm-store
