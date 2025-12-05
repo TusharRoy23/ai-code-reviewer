@@ -11,49 +11,35 @@ async function main() {
         // Get inputs
         const reviewFilePath = process.argv[2] || 'review.json';
         const token = process.env.GITHUB_TOKEN;
-
-        if (!token) {
-            throw new Error('GITHUB_TOKEN environment variable is required');
-        }
+        if (!token) throw new Error('GITHUB_TOKEN environment variable is required');
 
         // Initialize Octokit
         const octokit = github.getOctokit(token);
         const context = github.context;
 
-        // Read review file
         const reviewContent = fs.readFileSync(reviewFilePath, 'utf8').trim();
-
         if (!reviewContent) {
             console.log('No review content found');
             return;
         }
+
         let reviews;
         // Parse reviews
         try {
             // Make sure the reviewContent is JSON safe
             // const sanitized = reviewContent.replace(/```(json|diff)?/g, '').trim()
             reviews = JSON.parse(reviewContent);
-
             // Validate structure
-            if (!Array.isArray(reviews['findings'])) {
-                throw new Error('Reviews must be an array');
-            }
-
+            if (!Array.isArray(reviews['findings'])) throw new Error('Reviews must be an array');
             console.log(`Parsed ${reviews['summary']?.totalIssues} review chunks`);
         } catch (e) {
-            console.error('Failed to parse review file as JSON:', e.message);
-            console.error('Content preview:', reviewContent.substring(0, 500));
-            console.error('Content type:', typeof reviewContent);
-
+            console.error('Failed to parse review file:', e.message);
             throw e;
         }
 
         // Get PR number
         const pr_number = context.payload.pull_request?.number || context.payload.issue?.number;
-
-        if (!pr_number) {
-            throw new Error('Could not determine PR number from context');
-        }
+        if (!pr_number) throw new Error('Could not determine PR number from context');
 
         console.log(`\nPosting reviews for PR #${pr_number}`);
 
@@ -67,7 +53,9 @@ async function main() {
         const commit_id = pr.head.sha;
         console.log(`Using commit: ${commit_id}\n`);
 
-        // Track statistics
+        const diff = await getPullRequestDiff(octokit, context, pr_number);
+        const lineMap = buildLineMap(diff);
+
         let commentCount = 0;
         let errorCount = 0;
         const failedComments = [];
@@ -77,49 +65,37 @@ async function main() {
             const filename = chunk.file;
             console.log(`Processing file: ${filename}`);
 
-            if (!chunk.issues || chunk.issues.length === 0) {
-                console.log(`No issues found for this file`);
-                continue;
-            }
+            if (!chunk.issues || chunk.issues.length === 0) continue;
 
             for (const issue of chunk.issues) {
-                const categoryType = issue.type || 'general';
                 // Skip if no line number
-                if (!issue.lineStart) {
-                    console.log(`Skipping issue (no lineStart): ${issue.description?.substring(0, 50)}...`);
-                    continue;
-                }
+                if (!issue.lineStart) continue;
 
                 // Format comment body
-                const commentBody = formatComment(categoryType, issue);
+                const mappedLine = lineMap[filename]?.[issue.lineStart];
+                const commentBody = formatComment(issue.type, issue);
 
                 try {
-                    // Attempt to post line-specific comment
+                    if (!mappedLine) throw { status: 422, message: 'Line not in diff' };
+
                     await octokit.rest.pulls.createReviewComment({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
                         pull_number: pr_number,
-                        commit_id: commit_id,
+                        commit_id,
                         path: filename,
-                        line: issue.lineStart,
+                        line: mappedLine,
                         side: "RIGHT",
                         body: commentBody
                     });
 
                     commentCount++;
-                    console.log(`Posted comment at line ${issue.lineStart}`);
-
+                    console.log(`Posted on mapped line ${mappedLine}`);
                 } catch (error) {
                     errorCount++;
                     console.error(`Failed to post comment at line ${issue.lineStart}: ${error.message}`);
-
                     // Store failed comment for fallback
-                    failedComments.push({
-                        filename,
-                        line: issue.lineStart,
-                        body: commentBody,
-                        error: error.message
-                    });
+                    failedComments.push({ filename, line: issue.lineStart, error: error.message });
 
                     // If it's a validation error (line not in diff), try posting as general comment
                     if (error.status === 422) {
@@ -130,10 +106,10 @@ async function main() {
                                 issue_number: pr_number,
                                 body: `**${filename}** (around line ${issue.lineStart})\n\n${commentBody}`
                             });
-                            console.log(`Posted as general comment instead`);
+                            console.log(`Fallback general comment posted`);
                             commentCount++;
                         } catch (fallbackError) {
-                            console.error(`Fallback also failed: ${fallbackError.message}`);
+                            console.error(`Fallback failed: ${fallbackError.message}`);
                         }
                     }
                 }
@@ -182,37 +158,72 @@ async function main() {
         console.log(`\nReview posting completed!`);
 
     } catch (error) {
-        console.error('\nFatal error:', error.message);
-        console.error(error.stack);
+        console.error('Fatal error:', error.message);
         process.exit(1);
     }
 }
 
-/**
- * Format a comment for GitHub
- */
-function formatComment(categoryType, issue) {
-    const severityBadge = getSeverityBadge(issue.severity);
+// --- Build map from original lines → diff lines ---
+function buildLineMap(diffText) {
+    const map = {};
+    let currentFile = null;
+    let oldLine = 0;
+    let newLine = 0;
 
-    return `**[${categoryType.toUpperCase()}]** ${issue.type || 'Issue'}
+    const lines = diffText.split('\n');
 
-${issue.description}
+    for (const line of lines) {
+        if (line.startsWith('diff --git')) {
+            currentFile = null;
+            continue;
+        }
+        if (line.startsWith('+++ b/')) {
+            currentFile = line.replace('+++ b/', '').trim();
+            if (!map[currentFile]) map[currentFile] = {};
+            continue;
+        }
+        if (line.startsWith('@@')) {
+            const match = /@@ -(\d+),(\d+) \+(\d+),(\d+)/.exec(line);
+            if (match) {
+                oldLine = parseInt(match[1], 10);
+                newLine = parseInt(match[3], 10);
+            }
+            continue;
+        }
+        if (!currentFile) continue;
 
-**Recommendation:** ${issue.recommendation}
+        if (line.startsWith('+')) {
+            map[currentFile][oldLine] = newLine;
+            newLine++;
+        } else if (line.startsWith('-')) {
+            oldLine++;
+        } else {
+            map[currentFile][oldLine] = newLine;
+            oldLine++;
+            newLine++;
+        }
+    }
 
-**${severityBadge} Severity:** \`${issue.severity || 'medium'}\``;
+    return map;
 }
 
-/**
- * Get badge emoji for severity
- */
+async function getPullRequestDiff(octokit, context, pr_number) {
+    const { data } = await octokit.rest.pulls.get({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: pr_number,
+        mediaType: { format: 'diff' }
+    });
+    return data;
+}
+
+function formatComment(categoryType, issue) {
+    const severityBadge = getSeverityBadge(issue.severity);
+    return `**[${(categoryType || 'Issue').toUpperCase()}]**\n\n${issue.description}\n\n**Recommendation:** ${issue.recommendation}\n\n${severityBadge} **Severity:** \`${issue.severity || 'medium'}\``;
+}
+
 function getSeverityBadge(severity) {
-    const badges = {
-        critical: '🔴',
-        high: '🟠',
-        medium: '🟡',
-        low: '🟢',
-    };
+    const badges = { critical: '🔴', high: '🟠', medium: '🟡', low: '🟢' };
     return badges[severity?.toLowerCase()] || '🔵';
 }
 
