@@ -115,7 +115,6 @@ export interface AgentPlan {
     filename: string;
     agents: string[]; // e.g., ['security', 'performance']
     priority: Priority;
-    reasoning: string;
 }
 
 export interface Issue {

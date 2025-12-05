@@ -4,9 +4,8 @@ import { createAgent, initChatModel } from "langchain";
 import { getLLMConfig } from "../utils/llm-config.ts";
 
 const coordinatorSchema = z.object({
-    agents: z.enum(Agents),
+    agents: z.array(z.enum(Agents)),
     priority: z.enum(Priority).default(Priority.LOW),
-    reasoning: z.string()
 });
 
 const prompt = `You are a coordinator agent that analyzes code changes and determines which review agents are needed.
