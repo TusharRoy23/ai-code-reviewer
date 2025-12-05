@@ -84,8 +84,7 @@ async function main() {
                         pull_number: pr_number,
                         commit_id,
                         path: filename,
-                        line: mappedLine,
-                        side: "RIGHT",
+                        position: mappedLine,
                         body: commentBody
                     });
 
@@ -167,40 +166,58 @@ async function main() {
 function buildLineMap(diffText) {
     const map = {};
     let currentFile = null;
-    let oldLine = 0;
-    let newLine = 0;
+    let position = 0; // The 1-based index within the diff hunk (resets per hunk)
+    let newLine = 0; // The line number in the *target* file (b/)
 
-    const lines = diffText.split('\n');
+    const lines = diffText.split("\n");
 
     for (const line of lines) {
-        if (line.startsWith('diff --git')) {
-            currentFile = null;
+        // File path detection
+        if (line.startsWith("+++ b/")) {
+            const file = line.replace("+++ b/", "").trim();
+            currentFile = file;
+            map[currentFile] = {};
+            // position and newLine are reset by the Hunk Header
             continue;
         }
-        if (line.startsWith('+++ b/')) {
-            currentFile = line.replace('+++ b/', '').trim();
-            if (!map[currentFile]) map[currentFile] = {};
-            continue;
-        }
-        if (line.startsWith('@@')) {
-            const match = /@@ -(\d+),(\d+) \+(\d+),(\d+)/.exec(line);
-            if (match) {
-                oldLine = parseInt(match[1], 10);
-                newLine = parseInt(match[3], 10);
-            }
-            continue;
-        }
+
         if (!currentFile) continue;
 
+        // Hunk header
+        if (line.startsWith("@@")) {
+            // Extract the starting line number for the *target* file (b/)
+            const match = /@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+            if (match) {
+                // Set the current line number in the target file
+                newLine = parseInt(match[1], 10);
+            }
+            // The diff position starts counting from the line *after* the @@ header
+            position = 0;
+            continue;
+        }
+
+        // Only process actual hunk content lines
+        if (line.startsWith('+') || line.startsWith('-') || line.startsWith(' ')) {
+            // Increment position for *every* line that is part of the hunk body
+            position++;
+        } else {
+            // Skip non-hunk lines (like 'diff --git', '--- a/', etc.)
+            continue;
+        }
+
+        // Map logic: map the new file line number to the diff position
         if (line.startsWith('+')) {
-            map[currentFile][oldLine] = newLine;
+            // Added line: This is the only line type that GitHub guarantees support for inline comments.
+            map[currentFile][newLine] = position;
+            newLine++;
+        } else if (line.startsWith(' ')) {
+            // Context line: We still map it so the AI's reported line number is tracked, 
+            // but it will likely fail the inline comment API call and fall back.
+            map[currentFile][newLine] = position;
             newLine++;
         } else if (line.startsWith('-')) {
-            oldLine++;
-        } else {
-            map[currentFile][oldLine] = newLine;
-            oldLine++;
-            newLine++;
+            // Removed line: Cannot comment, and line number does not advance in target file.
+            continue;
         }
     }
 
