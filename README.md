@@ -51,7 +51,7 @@ jobs:
         with:
           fetch-depth: 0 
 
-      - uses: TusharRoy23/ai-code-reviewer@v0.0.5
+      - uses: TusharRoy23/ai-code-reviewer@v1.0.0
         with:
           trigger-phrase: "@ai-code-reviewer review"
           review-mode: "incremental"
@@ -90,8 +90,8 @@ llm-api-key: ${{ secrets.LLM_API_KEY }}
 |--------|-------------|---------|----------|
 | `trigger-phrase` | Keyword to manually trigger review | `@ai-code-reviewer review` | ❌ No |
 | `review-mode` | `incremental` (latest commit) or `full` (entire PR) | `incremental` | ❌ No |
-| `llm` | `deepseek-coder`, `gpt-4o-mini`, etc. | `gpt-4o-mini` | ❌ No |
-| `llm-api-key` | API KEY for LLM call | | ❌ No |
+| `llm` | `deepseek-coder`, `gpt-4o-mini`, etc. | `gpt-4o-mini` | ✅ Yes |
+| `llm-api-key` | API KEY for LLM call | | ✅ Yes |
 
 ### Review Modes
 
@@ -106,7 +106,7 @@ llm-api-key: ${{ secrets.LLM_API_KEY }}
 - Slightly slower
 
 ```yaml
-- uses: TusharRoy23/ai-code-reviewer@v0.0.5
+- uses: TusharRoy23/ai-code-reviewer@v1.0.0
   with:
     review-mode: "incremental"  # Or "full"
 ```
@@ -299,16 +299,8 @@ The action reviews code in:
 
 Found a bug or have a feature request?
 
-- 📧 [Open an Issue](../../issues)
-- 🍴 [Submit a PR](../../pulls)
-
----
-
-## 📞 Support
-
-- **Documentation**: Check the [README](README.md)
-- **Issues**: [GitHub Issues](../../issues)
-- **Discussions**: [GitHub Discussions](../../discussions)
+- 📧 [Open an Issue](https://github.com/TusharRoy23/ai-code-reviewer/issues)
+- 🍴 [Submit a PR](https://github.com/TusharRoy23/ai-code-reviewer/pulls)
 
 ---
 
@@ -321,5 +313,10 @@ If you find this action helpful, please consider:
 - 💬 Providing feedback
 
 ---
+## 📞  Stay in Touch
+- 📖 Read My Stories - [Medium](https://medium.com/@tushar-chy)
+- 🔗 Connect on - [LinkedIn](https://www.linkedin.com/in/tushar-roy-chy/)
+- 📫 Email Me - [chowdhurytusharroy@gmail.com](mailto:chowdhurytusharroy@gmail.com?subject=Hey%20there)
 
+---
 **Made with ❤️ by [TusharRoy23](https://github.com/TusharRoy23)**

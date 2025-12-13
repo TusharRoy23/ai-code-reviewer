@@ -281,33 +281,6 @@ export class ContextEnricher {
         // Find related files (files that import this one)
         const relatedFiles = this.findRelatedFiles(filename);
 
-        // ============================================
-        // SMART CONTEXT EXTRACTION
-        // ============================================
-
-        // Extract full function bodies (not just names)
-        // functionDetails = this.extractFunctionDetails(
-        //     diff,
-        //     contentBefore,
-        //     contentAfter,
-        //     functionsChanged,
-        //     changedLineRanges,
-        //     language
-        // );
-
-        // Extract type definitions
-        // typeDefinitions = this.extractTypeDefinitions(
-        //     contentAfter,
-        //     language
-        // );
-
-        // Build call graph
-        // callGraph = this.buildCallGraph(
-        //     contentAfter,
-        //     functionsChanged,
-        //     language
-        // );
-
         // Detect security-relevant patterns
         const securityContext = this.analyzeSecurityContext(
             diff,

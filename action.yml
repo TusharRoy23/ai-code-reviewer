@@ -17,12 +17,12 @@ inputs:
 
   llm:
     description: "Large Language Model. Ex: gpt-4o-mini, deepseek-coder, etc."
-    required: false
+    required: true
     default: "gpt-4o-mini"
 
   llm-api-key:
     description: "Large Language Model API KEY"
-    required: false
+    required: true
 
 runs:
   using: "composite"
