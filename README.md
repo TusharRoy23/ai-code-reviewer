@@ -51,7 +51,7 @@ jobs:
         with:
           fetch-depth: 0 
 
-      - uses: TusharRoy23/ai-code-reviewer@v0.0.5
+      - uses: TusharRoy23/ai-code-reviewer@v1.0.0
         with:
           trigger-phrase: "@ai-code-reviewer review"
           review-mode: "incremental"
@@ -106,7 +106,7 @@ llm-api-key: ${{ secrets.LLM_API_KEY }}
 - Slightly slower
 
 ```yaml
-- uses: TusharRoy23/ai-code-reviewer@v0.0.5
+- uses: TusharRoy23/ai-code-reviewer@v1.0.0
   with:
     review-mode: "incremental"  # Or "full"
 ```
