@@ -24,6 +24,10 @@ inputs:
     description: "Large Language Model API KEY"
     required: true
 
+  ai-mention:
+    description: "Mention keyword to trigger AI conversation (e.g., @ai-reviewer)"
+    default: "@ai-reviewer"
+
 runs:
   using: "composite"
   steps:
@@ -34,14 +38,94 @@ runs:
       id: check
       shell: bash
       run: |
-        if [[ "${{ github.event_name }}" != "pull_request" ]] && \
-           [[ ! "${{ github.event.comment.body }}" =~ "${{ inputs.trigger-phrase }}" ]]; then
+        echo "Event: ${{ github.event_name }}"
+        echo "Action: ${{ github.event.action }}"
+
+        # Determine what triggered this action
+        TRIGGER_TYPE="none"
+
+        # Case 1: New PR or PR update (original review flow)
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          echo "Triggered by PR event"
+          TRIGGER_TYPE="pr_review"
+
+        # Case 2: Comment on PR (conversational flow)
+        elif [[ "${{ github.event_name }}" == "pull_request_review_comment" ]] || \
+             [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+          
+          COMMENT_BODY="${{ github.event.comment.body }}"
+          echo "Comment body: $COMMENT_BODY"
+          
+          # Check if comment mentions AI
+          if [[ "$COMMENT_BODY" =~ ${{ inputs.ai-mention }} ]]; then
+            echo "AI mentioned in comment - conversational mode"
+            TRIGGER_TYPE="conversation"
+          else
+            echo "Comment doesn't mention AI, skipping"
+            TRIGGER_TYPE="none"
+          fi
+
+        # Case 3: Trigger phrase in comment (original flow)
+        elif [[ "${{ github.event.comment.body }}" =~ "${{ inputs.trigger-phrase }}" ]]; then
+          echo "Triggered by phrase: ${{ inputs.trigger-phrase }}"
+          TRIGGER_TYPE="pr_review"
+        fi
+
+        # Output results
+        if [[ "$TRIGGER_TYPE" == "none" ]]; then
           echo "skip=true" >> $GITHUB_OUTPUT
-          echo "Skipping: Not triggered by PR or trigger phrase"
+          echo "trigger_type=none" >> $GITHUB_OUTPUT
+          echo "Skipping: No valid trigger detected"
         else
           echo "skip=false" >> $GITHUB_OUTPUT
-          echo "Conditions met, proceeding with review"
+          echo "trigger_type=$TRIGGER_TYPE" >> $GITHUB_OUTPUT
+          echo "Proceeding with trigger type: $TRIGGER_TYPE"
         fi
+
+    # ------------------------------------------------------
+    # CONVERSATION MODE: Handle AI mentions in comments
+    # ------------------------------------------------------
+    - name: Handle conversation mode
+      if: steps.check.outputs.trigger_type == 'conversation'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_EVENT_PATH: ${{ github.event_path }}
+      run: |
+        echo "Conversation mode activated"
+        echo "Processing AI mention in comment..."
+
+        node ${{ github.action_path }}/scripts/conversation-handler.js
+
+        echo "Conversation context extracted"
+
+    - name: Generate conversation response
+      if: steps.check.outputs.trigger_type == 'conversation'
+      shell: bash
+      env:
+        API_BASE_URL: ${{ env.API_BASE_URL }}
+      run: |
+        echo "Generating AI response..."
+        node ${{ github.action_path }}/scripts/call-llm-api.js
+
+    - name: Post conversation reply
+      if: steps.check.outputs.trigger_type == 'conversation'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        echo "Posting reply to thread..."
+        node ${{ github.action_path }}/scripts/post-conversation-reply.js
+        echo "Conversation reply posted"
+
+    # Exit early if conversation mode (don't run code review)
+    - name: Exit after conversation
+      if: steps.check.outputs.trigger_type == 'conversation'
+      shell: bash
+      run: |
+        echo "Conversation handling complete"
+        exit 0
 
     - name: Checkout code
       if: steps.check.outputs.skip != 'true'

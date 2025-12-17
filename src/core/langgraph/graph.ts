@@ -5,7 +5,6 @@ import { edges } from "./edges/edges.ts";
 import { TYPES } from "../../config/types.ts";
 import type { IReviewerNodes } from "./interface/IReviewer.nodes.ts";
 import type { IGraphBuilder } from "./interface/IGraphBuilder.ts";
-import type { AgentPlan, Chunk, FileContext } from "./utils/types.ts";
 
 const checkpointer = new MemorySaver();
 
