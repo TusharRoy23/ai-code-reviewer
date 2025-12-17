@@ -5,6 +5,8 @@ on:
         types: [opened, synchronize, reopened]
     issue_comment:
         types: [created]
+    pull_request_review_comment: # ADD THIS - for inline code comments
+        types: [created]
 
 jobs:
     review:
@@ -23,6 +25,7 @@ jobs:
             - uses: ./
               with:
                   trigger-phrase: "@ai-code-reviewer review"
-                  review-mode: "full"
+                  review-mode: "incremental"
                   llm: ${{ secrets.LLM }} # "gpt-4o-mini"
                   llm-api-key: ${{ secrets.LLM_API_KEY }}
+                  ai-mention: "@ai-reviewer" # ADD THIS - to pass the mention keyword
