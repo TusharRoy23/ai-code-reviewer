@@ -1,5 +1,5 @@
-const { Octokit } = require('@octokit/rest');
-const fs = require('fs');
+import { Octokit } from '@octokit/rest';
+import { readFileSync } from "fs";
 
 const octokit = new Octokit({
     auth: process.env.GITHUB_TOKEN
@@ -11,7 +11,7 @@ async function postReply() {
     console.log('Posting conversation reply...');
 
     // Read the response
-    const response = JSON.parse(fs.readFileSync('conversation-response.json', 'utf8'));
+    const response = JSON.parse(readFileSync('conversation-response.json', 'utf8'));
 
     try {
         // Post reply to the comment thread

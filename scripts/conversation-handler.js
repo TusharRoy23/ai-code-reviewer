@@ -1,5 +1,5 @@
-const { Octokit } = require('@octokit/rest');
-const fs = require('fs');
+import { Octokit } from '@octokit/rest';
+import { readFileSync, writeFileSync } from "fs";
 
 const octokit = new Octokit({
     auth: process.env.GITHUB_TOKEN
@@ -14,7 +14,7 @@ async function main() {
     const eventName = process.env.GITHUB_EVENT_NAME;
     const eventPath = process.env.GITHUB_EVENT_PATH;
 
-    const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+    const event = JSON.parse(readFileSync(eventPath, 'utf8'));
 
     console.log(`Event type: ${eventName}`);
     console.log(`Comment ID: ${event.comment?.id}`);
@@ -40,7 +40,7 @@ async function main() {
     console.log(`  Surrounding context lines: ${enrichedContext.codeContext.surroundingLines?.length || 0}`);
 
     // Save for backend API
-    fs.writeFileSync('llm-context.json', JSON.stringify(enrichedContext, null, 2));
+    writeFileSync('llm-context.json', JSON.stringify(enrichedContext, null, 2));
     console.log('Full context saved to llm-context.json');
 }
 

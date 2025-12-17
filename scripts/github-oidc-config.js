@@ -1,4 +1,4 @@
-const core = require('@actions/core');
+import * as core from "@actions/core";
 
 const API_BASE_URL = process.env.API_BASE_URL || "https://ai-code-reviewer-restless-violet-7974.fly.dev";
 
